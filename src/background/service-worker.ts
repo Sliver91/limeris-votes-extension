@@ -53,16 +53,31 @@ async function updateSurface(servers: VoteServer[], now: number) {
   else chrome.alarms.clear(NEXT_ALARM);
 }
 
-async function notify({ server, count, reminder }: Notice) {
-  const id = NOTIFICATION_PREFIX + server.id;
+/**
+ * Affiche une notification. Avec `stay`, elle reste à l'écran jusqu'à ce qu'on la ferme : Windows
+ * la range alors parmi les rappels, qu'il affiche même pendant une vidéo ou un jeu en plein écran,
+ * au lieu de la glisser sans bruit dans le centre de notifications.
+ */
+async function showNotification(id: string, title: string, message: string, stay: boolean) {
   // Recréer une notification déjà affichée ne la fait pas réapparaître : on la retire d'abord.
   await chrome.notifications.clear(id);
   await chrome.notifications.create(id, {
     type: 'basic',
     iconUrl: chrome.runtime.getURL('icons/128.png'),
-    title: reminder ? 'Rappel de vote' : 'Vote disponible',
-    message: `${count} vote${count > 1 ? 's' : ''} disponible${count > 1 ? 's' : ''} pour ${server.name}.`,
+    title,
+    message,
+    requireInteraction: stay,
+    buttons: [{ title: 'Voter' }],
   });
+}
+
+async function notify({ server, count, reminder }: Notice, stay: boolean) {
+  await showNotification(
+    NOTIFICATION_PREFIX + server.id,
+    reminder ? 'Rappel de vote' : 'Vote disponible',
+    `${count} vote${count > 1 ? 's' : ''} disponible${count > 1 ? 's' : ''} pour ${server.name}.`,
+    stay
+  );
 }
 
 /** Le service worker ne peut pas jouer de son : une page invisible le fait pour lui. */
@@ -87,7 +102,7 @@ async function check() {
   const result = checkServers(data, now);
   if (result.changed) await writeData({ ...data, servers: result.servers });
   await appendHistory(result.events);
-  for (const notice of result.notices) await notify(notice);
+  for (const notice of result.notices) await notify(notice, data.settings.stayOnScreen);
   if (result.notices.length > 0 && data.settings.sound) await playSound(data.settings.soundKind, data.settings.volume);
   await updateSurface(result.servers, now);
 }
@@ -216,14 +231,12 @@ async function showPanel() {
 /** Notification d'essai demandée depuis les Paramètres : même chemin qu'un vrai rappel, son compris. */
 async function testNotification() {
   const { settings } = await readData();
-  const id = `${NOTIFICATION_PREFIX}test`;
-  await chrome.notifications.clear(id);
-  await chrome.notifications.create(id, {
-    type: 'basic',
-    iconUrl: chrome.runtime.getURL('icons/128.png'),
-    title: 'Test de notification',
-    message: 'Les rappels de Limeris votes fonctionnent sur cet appareil.',
-  });
+  await showNotification(
+    `${NOTIFICATION_PREFIX}test`,
+    'Test de notification',
+    'Les rappels de Limeris votes fonctionnent sur cet appareil.',
+    settings.stayOnScreen
+  );
   if (settings.sound) await playSound(settings.soundKind, settings.volume);
 }
 
@@ -251,7 +264,8 @@ chrome.storage.onChanged.addListener((changes, area) => {
   scheduleSync();
 });
 
-chrome.notifications.onClicked.addListener(async (id) => {
+/** Clic sur une notification, ou sur son bouton « Voter » : affiche l'outil sur le bon serveur. */
+async function openFromNotification(id: string) {
   if (!id.startsWith(NOTIFICATION_PREFIX)) return;
   chrome.notifications.clear(id);
   const serverId = id.slice(NOTIFICATION_PREFIX.length);
@@ -260,7 +274,10 @@ chrome.notifications.onClicked.addListener(async (id) => {
     await writeData({ ...data, currentId: serverId });
   }
   await showPanel();
-});
+}
+
+chrome.notifications.onClicked.addListener(openFromNotification);
+chrome.notifications.onButtonClicked.addListener((id) => openFromNotification(id));
 
 // Messages de la page limeris.fr (seules ses pages peuvent en envoyer, voir le manifeste ; l'origine
 // est revérifiée ici). `ping` lui dit si l'extension est là, `connect` lui remet le jeton du compte,

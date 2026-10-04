@@ -62,6 +62,11 @@ export interface VoteSettings {
   volume: number;
   openMode: OpenMode;
   chain: boolean;
+  /**
+   * La notification reste à l'écran jusqu'à ce qu'on la ferme. Windows la traite alors comme un
+   * rappel : il l'affiche même pendant une vidéo ou un jeu en plein écran. Propre à l'appareil.
+   */
+  stayOnScreen: boolean;
 }
 
 export const DEFAULT_SETTINGS: VoteSettings = {
@@ -75,6 +80,7 @@ export const DEFAULT_SETTINGS: VoteSettings = {
   volume: 0.6,
   openMode: 'tab',
   chain: true,
+  stayOnScreen: true,
 };
 
 /** Ce qui est enregistré dans le navigateur sous STATE_KEY. */

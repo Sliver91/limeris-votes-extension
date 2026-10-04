@@ -323,7 +323,7 @@ function TestNotification() {
         <p className="text-xs text-text-muted">
           {left > 0
             ? 'Tu peux fermer cet écran : elle arrivera quand même, avec le son choisi.'
-            : "Notification envoyée à Windows. Rien vu ? Regarde dans le centre de notifications (l'horloge en bas à droite) : Windows y range les notifications sans les afficher pendant une vidéo ou un jeu en plein écran, ou quand « Ne pas déranger » est activé."}
+            : "Notification envoyée à Windows. Rien vu ? Active « Garder la notification à l'écran » ci-dessus : Windows l'affiche alors même pendant une vidéo ou un jeu en plein écran. Sinon, il la range sans bruit dans le centre de notifications (l'horloge en bas à droite)."}
         </p>
       )}
     </div>
@@ -346,6 +346,13 @@ function SettingsTab() {
       <Card className="flex min-w-0 flex-col gap-3">
         <h2 className="text-sm font-semibold text-text">Rappels</h2>
         <Switch checked={settings.notify} onChange={(notify) => update({ notify })} label="Prévenir dès qu'un vote est disponible" />
+        {host.extension === 'self' && (
+          <Switch
+            checked={settings.stayOnScreen}
+            onChange={(stayOnScreen) => update({ stayOnScreen })}
+            label="Garder la notification à l'écran jusqu'à ce que je la ferme"
+          />
+        )}
         <label className="flex flex-wrap items-center justify-between gap-3 text-sm text-text">
           Relancer si je n'ai pas voté
           <select

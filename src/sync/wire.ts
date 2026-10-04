@@ -202,6 +202,8 @@ function applySite(remote: WireSite, local: VoteSite | undefined, now: number): 
 function applySettings(remote: WireSettings, local: VoteSettings): VoteSettings {
   const known = (VOTE_SOUNDS as readonly string[]).includes(remote.sonType);
   return {
+    // Ce qui ne se synchronise pas (propre à l'appareil) est gardé tel quel.
+    ...local,
     notify: remote.notifier,
     remindMinutes: remote.relanceMinutes,
     quietNight: remote.silenceActif,
