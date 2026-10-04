@@ -240,9 +240,10 @@ function VotesTab() {
                       <p className="font-mono text-xs tabular-nums text-text-muted">dans {formatLeft((site.nextAt ?? now) - now)}</p>
                     )}
                   </div>
+                  {/* Toujours cliquable, même pendant le délai : le compte à rebours peut se tromper. */}
                   <Button
                     variant="secondary"
-                    disabled={!available}
+                    title={available ? undefined : 'Ouvrir ce site quand même'}
                     onClick={() => setQueue([site.id])}
                     className="shrink-0 px-2.5 py-1.5 text-xs sm:px-3"
                   >
@@ -409,7 +410,7 @@ function SettingsTab() {
         </a>
         <div className="min-w-0">
           <p className="text-sm font-semibold text-text">
-            Limeris VOTES <span className="font-mono text-xs font-normal text-text-muted">v{chrome.runtime.getManifest().version}</span>
+            Limeris votes <span className="font-mono text-xs font-normal text-text-muted">v{chrome.runtime.getManifest().version}</span>
           </p>
           <p className="text-xs text-text-muted">
             Développé par <span className="font-medium text-text">Sliver91</span> · <SiteLink />

@@ -129,7 +129,14 @@ export function Popup() {
                   <span className="h-2 w-2 rounded-full bg-emerald-500" /> Disponible
                 </button>
               ) : (
-                <span className="font-mono text-xs tabular-nums text-text-muted">dans {formatLeft((site.nextAt ?? now) - now)}</span>
+                <button
+                  type="button"
+                  onClick={() => vote([site.id])}
+                  title="Ouvrir ce site quand même"
+                  className="font-mono text-xs tabular-nums text-text-muted hover:text-text"
+                >
+                  dans {formatLeft((site.nextAt ?? now) - now)}
+                </button>
               )}
             </div>
           );

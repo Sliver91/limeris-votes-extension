@@ -28,7 +28,13 @@ const USUAL_DELAY_MIN: Record<string, number> = {
   'serveur-minecraft-vote.fr': 90,
 };
 
-type Phase = 'waiting' | 'manual' | 'done' | 'early' | 'delay' | 'select' | 'error';
+const delayPillClass = (active: boolean) =>
+  `rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+    active ? 'border-accent bg-accent-soft text-text' : 'border-border text-text-muted hover:text-text'
+  }`;
+const delayInputClass = 'w-14 rounded-lg border border-border bg-surface px-2 py-1 text-sm tabular-nums text-text';
+
+type Phase ='waiting' | 'manual' | 'done' | 'early' | 'delay' | 'select' | 'error';
 
 interface VoteQueueProps {
   server: VoteServer;
@@ -45,6 +51,10 @@ export function VoteQueue({ server, siteIds, onClose }: VoteQueueProps) {
   const [gameServers, setGameServers] = useState<Record<string, string> | null>(null);
   const [confirmed, setConfirmed] = useState(0);
   const [manualDelay, setManualDelay] = useState(180);
+  /** Délai exact saisi à la main (heures et minutes), à la place d'un des délais proposés. */
+  const [custom, setCustom] = useState(false);
+  const [customHours, setCustomHours] = useState('');
+  const [customMinutes, setCustomMinutes] = useState('');
 
   const timer = useRef<number>();
   const openedAt = useRef(0);
@@ -52,6 +62,10 @@ export function VoteQueue({ server, siteIds, onClose }: VoteQueueProps) {
   const runId = useRef(0);
   const serverRef = useRef(server);
   serverRef.current = server;
+  /** Vrai tant que l'utilisateur choisit son délai : les réponses du site ne changent plus l'écran. */
+  const choosingDelay = useRef(false);
+  /** Le site du serveur a confirmé le vote pendant que l'utilisateur choisissait son délai. */
+  const [serverConfirmed, setServerConfirmed] = useState(false);
 
   const site = server.sites.find((s) => s.id === siteIds[index]);
   const hasNext = index + 1 < siteIds.length;
@@ -77,8 +91,13 @@ export function VoteQueue({ server, siteIds, onClose }: VoteQueueProps) {
       const res = await confirmVote(current.baseUrl, target.voteUrl, current.pseudo, gameServer);
       if (run !== runId.current) return;
 
+      // Pendant le choix du délai, une réponse du site ne doit pas refermer ce choix sous les
+      // doigts de l'utilisateur : on continue d'écouter (c'est cet appel qui donne la récompense)
+      // mais l'écran reste sur le choix.
+      const choosing = choosingDelay.current;
+
       if (res.status === 'pending') {
-        if (Date.now() - openedAt.current > POLL_TIMEOUT_MS) {
+        if (!choosing && Date.now() - openedAt.current > POLL_TIMEOUT_MS) {
           setPhase('error');
           setMessage("Le vote n'a pas été confirmé au bout de 6 minutes. Réessaie ou passe au site suivant.");
           return;
@@ -87,11 +106,13 @@ export function VoteQueue({ server, siteIds, onClose }: VoteQueueProps) {
         return;
       }
       if (res.status === 'select_server') {
+        choosingDelay.current = false;
         setGameServers(res.servers ?? {});
         setPhase('select');
         return;
       }
       if (res.status === 'delay') {
+        if (choosing) return;
         setMessage(res.message);
         setPhase('delay');
         refreshServer(current.id);
@@ -109,6 +130,10 @@ export function VoteQueue({ server, siteIds, onClose }: VoteQueueProps) {
       setMessage(res.message);
       refreshServer(current.id);
 
+      if (choosing) {
+        setServerConfirmed(true);
+        return;
+      }
       if (Date.now() - openedAt.current < EARLY_CONFIRM_MS) {
         setPhase('early');
         return;
@@ -116,7 +141,7 @@ export function VoteQueue({ server, siteIds, onClose }: VoteQueueProps) {
       setPhase('done');
       finishStep();
     } catch (e) {
-      if (run !== runId.current) return;
+      if (run !== runId.current || choosingDelay.current) return;
       setMessage(describeVoteError(e));
       setPhase('error');
     }
@@ -125,6 +150,8 @@ export function VoteQueue({ server, siteIds, onClose }: VoteQueueProps) {
   useEffect(() => {
     if (!site) return;
     const run = ++runId.current;
+    choosingDelay.current = false;
+    setServerConfirmed(false);
     setPhase('waiting');
     setMessage(null);
     setGameServers(null);
@@ -148,18 +175,46 @@ export function VoteQueue({ server, siteIds, onClose }: VoteQueueProps) {
   /** Ouvre le choix du délai : c'est l'utilisateur qui valide, le site du serveur n'ayant pas confirmé. */
   function askManualDelay() {
     if (!site) return;
-    setManualDelay(site.manualDelayMin ?? USUAL_DELAY_MIN[site.host] ?? 180);
+    // Le dernier délai choisi pour ce site est repris, y compris s'il avait été saisi à la main.
+    const initial = site.manualDelayMin ?? USUAL_DELAY_MIN[site.host] ?? 180;
+    setManualDelay(initial);
+    setCustom(!MANUAL_DELAYS_MIN.includes(initial));
+    setCustomHours(String(Math.floor(initial / 60)));
+    setCustomMinutes(String(initial % 60));
+    choosingDelay.current = true;
     setPhase('manual');
+  }
+
+  function pickPreset(min: number) {
+    setCustom(false);
+    setManualDelay(min);
+  }
+
+  function openCustom() {
+    setCustom(true);
+    setCustomHours(String(Math.floor(manualDelay / 60)));
+    setCustomMinutes(String(manualDelay % 60));
+  }
+
+  function changeCustom(hours: string, minutes: string) {
+    setCustomHours(hours);
+    setCustomMinutes(minutes);
+    const total = Math.floor(Number(hours) || 0) * 60 + Math.floor(Number(minutes) || 0);
+    setManualDelay(Math.max(0, total));
   }
 
   function validateManually() {
     if (!site) return;
     window.clearTimeout(timer.current);
     runId.current += 1;
+    choosingDelay.current = false;
     useVoteStore.getState().validateManually(server.id, site.id, manualDelay);
-    useVoteHistoryStore.getState().push({ t: Date.now(), serverId: server.id, host: site.host, kind: 'v', manual: true });
-    setConfirmed((c) => c + 1);
-    setMessage(`Vote validé par toi. Prochain rappel dans ${formatDelay(manualDelay)}.`);
+    // Si le site du serveur a confirmé entre-temps, le vote est déjà compté : seul le délai change.
+    if (!serverConfirmed) {
+      useVoteHistoryStore.getState().push({ t: Date.now(), serverId: server.id, host: site.host, kind: 'v', manual: true });
+      setConfirmed((c) => c + 1);
+    }
+    setMessage(`${serverConfirmed ? 'Vote confirmé par le site du serveur.' : 'Vote validé par toi.'} Prochain rappel dans ${formatDelay(manualDelay)}.`);
     setPhase('done');
     finishStep();
   }
@@ -172,6 +227,7 @@ export function VoteQueue({ server, siteIds, onClose }: VoteQueueProps) {
   function retry() {
     if (!site) return;
     const run = ++runId.current;
+    choosingDelay.current = false;
     setPhase('waiting');
     setMessage(null);
     openedAt.current = Date.now();
@@ -211,7 +267,7 @@ export function VoteQueue({ server, siteIds, onClose }: VoteQueueProps) {
             : phase === 'select'
               ? 'Choisis le serveur de jeu qui reçoit la récompense.'
               : phase === 'manual'
-                ? 'Dans combien de temps ce site redevient-il disponible ?'
+                ? `${serverConfirmed ? 'Le site du serveur a confirmé le vote. ' : ''}Dans combien de temps ce site redevient-il disponible ?`
                 : message;
 
   return (
@@ -262,21 +318,54 @@ export function VoteQueue({ server, siteIds, onClose }: VoteQueueProps) {
       )}
 
       {phase === 'manual' && (
-        <div className="flex flex-wrap items-center gap-2">
-          {MANUAL_DELAYS_MIN.map((min) => (
-            <button
-              key={min}
-              type="button"
-              onClick={() => setManualDelay(min)}
-              aria-pressed={manualDelay === min}
-              className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-                manualDelay === min ? 'border-accent bg-accent-soft text-text' : 'border-border text-text-muted hover:text-text'
-              }`}
-            >
-              {formatDelay(min)}
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {MANUAL_DELAYS_MIN.map((min) => (
+              <button
+                key={min}
+                type="button"
+                onClick={() => pickPreset(min)}
+                aria-pressed={!custom && manualDelay === min}
+                className={delayPillClass(!custom && manualDelay === min)}
+              >
+                {formatDelay(min)}
+              </button>
+            ))}
+            <button type="button" onClick={openCustom} aria-pressed={custom} className={delayPillClass(custom)}>
+              Autre
             </button>
-          ))}
-          <Button onClick={validateManually}>Valider</Button>
+          </div>
+          {custom && (
+            <div className="flex flex-wrap items-center gap-1.5 text-xs text-text-muted">
+              <input
+                type="number"
+                min={0}
+                max={72}
+                inputMode="numeric"
+                aria-label="Heures"
+                value={customHours}
+                onChange={(e) => changeCustom(e.target.value, customMinutes)}
+                className={delayInputClass}
+              />
+              h
+              <input
+                type="number"
+                min={0}
+                max={59}
+                inputMode="numeric"
+                aria-label="Minutes"
+                value={customMinutes}
+                onChange={(e) => changeCustom(customHours, e.target.value)}
+                className={delayInputClass}
+              />
+              min
+            </div>
+          )}
+          <div>
+            <Button onClick={validateManually} disabled={manualDelay < 1}>
+              Valider{manualDelay >= 1 ? ` · ${formatDelay(manualDelay)}` : ''}
+            </Button>
+          </div>
         </div>
       )}
 
@@ -288,8 +377,8 @@ export function VoteQueue({ server, siteIds, onClose }: VoteQueueProps) {
       )}
 
       <div className="flex flex-wrap gap-2">
-        {(phase === 'waiting' || phase === 'error') && (
-          <Button variant={phase === 'error' ? 'secondary' : 'primary'} onClick={askManualDelay}>
+        {(phase === 'waiting' || phase === 'error' || phase === 'delay') && (
+          <Button variant={phase === 'waiting' ? 'primary' : 'secondary'} onClick={askManualDelay}>
             J'ai voté
           </Button>
         )}

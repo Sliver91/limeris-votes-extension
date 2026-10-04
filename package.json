@@ -1,7 +1,7 @@
 {
   "name": "limeris-votes-extension",
-  "version": "0.1.0",
-  "description": "Limeris VOTES — extension Chrome / Brave : rappels et file de vote pour les serveurs Minecraft.",
+  "version": "0.1.1",
+  "description": "Limeris votes — extension Chrome / Brave : rappels et file de vote pour les serveurs Minecraft.",
   "author": "Sliver91 (https://limeris.fr)",
   "license": "UNLICENSED",
   "homepage": "https://limeris.fr",

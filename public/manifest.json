@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Limeris VOTES",
-  "version": "0.1.0",
+  "name": "Limeris votes",
+  "version": "0.1.1",
   "description": "Rappels et file de vote pour les serveurs Minecraft : sois prévenu dès qu'un site de vote redevient disponible. Développée par Sliver91.",
   "homepage_url": "https://limeris.fr",
   "minimum_chrome_version": "116",
@@ -12,7 +12,7 @@
     "128": "icons/128.png"
   },
   "action": {
-    "default_title": "Limeris VOTES",
+    "default_title": "Limeris votes",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/16.png",

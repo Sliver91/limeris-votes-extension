@@ -119,11 +119,11 @@ export function applyStatus(
       lastCheckedAt: now,
       error: null,
       sites: server.sites.map((site) => {
-        // Le délai du site du serveur fait foi ; à défaut, celui lancé à la main tient
-        // tant qu'il court, sinon un rafraîchissement remettrait le site en « disponible ».
+        // Le délai choisi à la main fait foi tant qu'il court : c'est le choix de l'utilisateur,
+        // et le site du serveur ne connaît pas toujours ce vote. À défaut, celui du site du serveur.
         const remote = sites[site.id] ?? null;
         const local = site.localUntil ?? null;
-        const next = remote !== null && remote > now ? remote : local !== null && local > now ? local : null;
+        const next = local !== null && local > now ? local : remote !== null && remote > now ? remote : null;
         // Un délai en cours remet le signalement à zéro : le moteur préviendra à son échéance.
         return next !== null
           ? { ...site, nextAt: next, notified: false, lastRemindAt: null }

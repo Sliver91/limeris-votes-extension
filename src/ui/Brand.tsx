@@ -17,7 +17,7 @@ export function Brand() {
         <img src="icons/128.png" alt="Limeris" width={32} height={32} className="h-8 w-8 rounded-lg" />
       </a>
       <div className="min-w-0 leading-tight">
-        <h1 className="truncate text-sm font-semibold text-text">Limeris VOTES</h1>
+        <h1 className="truncate text-sm font-semibold text-text">Limeris votes</h1>
         <SiteLink className="text-xs" />
       </div>
     </div>

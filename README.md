@@ -2,7 +2,7 @@
 
 <img src="public/icons/128.png" alt="Logo Limeris" width="96" height="96">
 
-# Limeris VOTES
+# Limeris votes
 
 **Ne rate plus jamais un vote pour ton serveur Minecraft.**
 
@@ -43,24 +43,6 @@ Ne déplace pas le dossier `extension` après l'installation : le navigateur le 
 
 - Aucun compte, aucun serveur intermédiaire : tes serveurs, tes paramètres et ton historique restent dans ton navigateur.
 - L'extension ne demande l'accès qu'aux sites des serveurs que tu ajoutes, un par un. Elle ne lit ni ton historique ni le contenu des autres pages.
-
-## Pour les développeurs
-
-```
-npm install
-npm run build     # vérifie les types puis construit dans dist/
-npm run dev       # reconstruit à chaque modification
-npm test          # lecture de la page de vote et moteur de rappels
-```
-
-| Dossier | Rôle |
-|---|---|
-| `src/azuriom/` | Appels au site du serveur : sites de vote, statut du pseudo, confirmation du vote |
-| `src/background/` | Service worker : réveils, notifications, nombre sur l'icône |
-| `src/store/` | Données et enregistrement dans le navigateur |
-| `src/ui/`, `src/panel/`, `src/popup/` | Écrans (React + Tailwind) |
-| `src/offscreen/` | Page invisible qui joue le son d'un rappel |
-| `src/platform.ts` | Onglets, autorisations, panneau latéral |
 
 ## Licence
 
