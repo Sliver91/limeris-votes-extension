@@ -1,0 +1,31 @@
+﻿Limeris votes — installation en mode développeur
+================================================
+
+Navigateurs : Chrome ou Brave, sur ordinateur.
+
+1. Ouvre la page des extensions :
+     Chrome : chrome://extensions
+     Brave  : brave://extensions
+
+2. Active « Mode développeur » (interrupteur en haut à droite).
+
+3. Clique sur « Charger l'extension non empaquetée »
+   et choisis le dossier « extension » qui se trouve à côté de ce fichier.
+
+4. Épingle l'extension : icône en forme de pièce de puzzle dans la barre
+   du navigateur, puis l'épingle à côté de « Limeris votes ».
+
+5. Clique sur l'icône Limeris, puis « Ajouter un serveur » :
+   l'adresse du site du serveur (par exemple atheramc.fr) et ton pseudo.
+   Le navigateur demande d'autoriser l'accès à ce site : accepte.
+
+À savoir
+--------
+- Ne déplace pas et ne supprime pas le dossier « extension » après
+  l'installation : le navigateur le relit à chaque démarrage.
+- Les rappels arrivent tant que le navigateur est ouvert.
+- Pour mettre à jour : remplace le contenu du dossier « extension »,
+  puis clique sur la flèche de rechargement de l'extension dans la page
+  des extensions.
+
+Site : https://limeris.fr
