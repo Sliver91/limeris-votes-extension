@@ -14,7 +14,7 @@ export const HISTORY_KEY = 'limeris-minecraft-votes-history';
 /** Complète ce qui a été enregistré par une version plus ancienne (réglages ajoutés depuis). */
 export function reviveData(saved: Partial<VoteData> | undefined): VoteData {
   const settings = { ...DEFAULT_SETTINGS, ...saved?.settings };
-  // Un son retiré depuis (Carillon, Cloche, Discret) est remplacé par celui par défaut.
+  // Un son retiré depuis (Carillon, Cloche, Discret, WhatsApp, Fears to Fathom, Sifflet western) est remplacé par celui par défaut.
   if (!VOTE_SOUNDS.includes(settings.soundKind)) settings.soundKind = DEFAULT_SETTINGS.soundKind;
   return {
     servers: saved?.servers ?? [],

@@ -45,7 +45,7 @@ export interface VoteServer {
 export type OpenMode = 'tab' | 'window';
 
 /** Sons de rappel livrés avec l'extension (public/sounds). */
-export const VOTE_SOUNDS = ['votes-commencent', 'whatsapp-web', 'fears-to-fathom', 'follow', 'western-whistle'] as const;
+export const VOTE_SOUNDS = ['votes-commencent', 'follow'] as const;
 export type VoteSound = (typeof VOTE_SOUNDS)[number];
 
 export interface VoteSettings {
