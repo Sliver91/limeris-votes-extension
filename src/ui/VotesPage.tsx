@@ -323,7 +323,7 @@ function TestNotification() {
         <p className="text-xs text-text-muted">
           {left > 0
             ? 'Tu peux fermer cet écran : elle arrivera quand même, avec le son choisi.'
-            : "Notification envoyée. Si tu n'as rien vu, vérifie que les notifications de ton navigateur sont autorisées dans Windows, et que le mode « Ne pas déranger » de Windows est coupé."}
+            : "Notification envoyée à Windows. Rien vu ? Regarde dans le centre de notifications (l'horloge en bas à droite) : Windows y range les notifications sans les afficher pendant une vidéo ou un jeu en plein écran, ou quand « Ne pas déranger » est activé."}
         </p>
       )}
     </div>
