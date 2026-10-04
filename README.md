@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="public/icons/128.png" alt="Logo Limeris" width="96" height="96">
+<img src="public/icons/512.png" alt="Logo Limeris votes" width="128" height="128">
 
 # Limeris votes
 
