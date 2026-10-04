@@ -8,7 +8,8 @@ import { useNow } from '../ui/useNow';
 import { describeVoteError } from '../azuriom/errors';
 import { openExternal, openPanel, setPendingQueue, setPendingTab } from '../platform';
 import { isAvailable, useAccountStore, useVoteStore } from '../store/store';
-import { describeSyncError, syncNow, VOTES_URL } from '../sync/limeris';
+import { VOTES_URL } from '../sync/limeris';
+import { syncFromScreen } from '../ui/accountActions';
 
 /**
  * Fenêtre de l'icône : le résumé seulement. Elle se ferme dès qu'on clique ailleurs, donc la file
@@ -153,22 +154,14 @@ export function Popup() {
 /** Pied de la fenêtre : accès à limeris.fr/votes, et synchronisation ou connexion au compte. */
 function AccountBar({ onConnect }: { onConnect: () => void }) {
   const account = useAccountStore((s) => s.account);
-  const setAccount = useAccountStore((s) => s.setAccount);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function sync() {
-    if (!account) return;
     setSyncing(true);
     setError(null);
-    try {
-      await syncNow(account);
-      setAccount({ ...account, lastSyncAt: Date.now() });
-    } catch (e) {
-      setError(describeSyncError(e));
-    } finally {
-      setSyncing(false);
-    }
+    setError(await syncFromScreen());
+    setSyncing(false);
   }
 
   return (

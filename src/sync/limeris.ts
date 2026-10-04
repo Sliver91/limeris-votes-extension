@@ -21,13 +21,29 @@ const LIMERIS_ORIGINS = ['https://limeris.fr', 'https://www.limeris.fr'];
 /** Messages que la page de limeris.fr peut envoyer à l'extension. */
 export const MSG_PING = 'limeris-votes:ping';
 export const MSG_CONNECT = 'limeris-votes:connect';
+/** Affiche l'outil (panneau ou onglet de l'extension). */
+export const MSG_OPEN = 'limeris-votes:open';
+/** Relit les délais d'un serveur déjà suivi par l'extension, depuis ce navigateur. */
+export const MSG_CHECK = 'limeris-votes:check';
+/** Demande au site d'un serveur déjà suivi si un vote est validé, depuis ce navigateur. */
+export const MSG_CONFIRM = 'limeris-votes:confirm';
 
 export interface LimerisAccount {
   /** Jeton réservé aux votes, remis par limeris.fr. Jamais affiché ni envoyé ailleurs. */
   token: string;
   pseudo: string;
+  /** Identifiant du compte sur limeris.fr : la page sait ainsi si l'extension est reliée au même compte qu'elle. */
+  accountId?: string;
   connectedAt: number;
   lastSyncAt: number | null;
+}
+
+/** Pourquoi l'extension n'est plus connectée, quand ce n'est pas l'utilisateur qui l'a demandé. */
+export type AccountNotice = 'revoked';
+
+/** Vrai si le texte a la forme d'un jeton : c'est limeris.fr qui dit ensuite s'il est valable. */
+export function isTokenShaped(token: string): boolean {
+  return token.length >= 20 && token.length <= 512 && !/\s/.test(token);
 }
 
 /** Vrai si le message vient bien d'une page de limeris.fr, et de nulle part ailleurs. */
@@ -46,12 +62,12 @@ export function isLimerisSender(sender: { origin?: string; url?: string }): bool
 /** Lit un message de connexion ; `null` s'il n'a pas la forme attendue. */
 export function parseConnectMessage(message: unknown, now: number): LimerisAccount | null {
   if (typeof message !== 'object' || message === null) return null;
-  const { type, token, pseudo } = message as Record<string, unknown>;
-  if (type !== MSG_CONNECT || typeof token !== 'string') return null;
-  if (token.length < 20 || token.length > 512 || /\s/.test(token)) return null;
+  const { type, token, pseudo, accountId } = message as Record<string, unknown>;
+  if (type !== MSG_CONNECT || typeof token !== 'string' || !isTokenShaped(token)) return null;
   return {
     token,
     pseudo: typeof pseudo === 'string' ? pseudo.slice(0, 64) : '',
+    ...(typeof accountId === 'string' && accountId.length > 0 && accountId.length <= 64 ? { accountId } : {}),
     connectedAt: now,
     lastSyncAt: null,
   };

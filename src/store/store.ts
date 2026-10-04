@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { ACCOUNT_KEY, bindStore, HISTORY_KEY, reviveData, STATE_KEY } from './chromeStorage';
-import type { LimerisAccount } from '../sync/limeris';
+import type { AccountNotice, LimerisAccount } from '../sync/limeris';
 import {
   applyStatus,
   DEFAULT_SETTINGS,
@@ -65,21 +65,24 @@ export const useVoteHistoryStore = create<VoteHistoryState>()((set) => ({
 interface AccountState {
   /** Compte limeris.fr connecté, ou null. Écrit par le service worker quand le site remet le jeton. */
   account: LimerisAccount | null;
-  setAccount: (account: LimerisAccount | null) => void;
+  /** Pourquoi l'extension n'est plus connectée, quand ce n'est pas l'utilisateur qui l'a demandé. */
+  notice: AccountNotice | null;
+  setAccount: (account: LimerisAccount | null, notice?: AccountNotice | null) => void;
 }
 
 export const useAccountStore = create<AccountState>()((set) => ({
   account: null,
-  setAccount: (account) => set({ account }),
+  notice: null,
+  setAccount: (account, notice = null) => set({ account, notice }),
 }));
 
 /** Tenue une fois les données enregistrées chargées : les écrans attendent ça pour s'afficher. */
 export const storeReady: Promise<unknown> = Promise.all([
-  bindStore<AccountState, { account: LimerisAccount | null }>(
+  bindStore<AccountState, { account: LimerisAccount | null; notice: AccountNotice | null }>(
     useAccountStore,
     ACCOUNT_KEY,
-    ({ account }) => ({ account }),
-    (saved) => ({ account: saved?.account ?? null })
+    ({ account, notice }) => ({ account, notice }),
+    (saved) => ({ account: saved?.account ?? null, notice: saved?.notice ?? null })
   ),
   bindStore<VoteStoreState, VoteData>(
     useVoteStore,

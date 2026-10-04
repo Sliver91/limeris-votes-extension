@@ -1,5 +1,5 @@
 import { DEFAULT_SETTINGS, MAX_EVENTS, VOTE_SOUNDS, type VoteData, type VoteEvent } from './types';
-import type { LimerisAccount } from '../sync/limeris';
+import type { AccountNotice, LimerisAccount } from '../sync/limeris';
 
 /**
  * Enregistrement dans le navigateur (chrome.storage.local), partagé entre le panneau, la fenêtre
@@ -58,8 +58,9 @@ export async function readAccount(): Promise<LimerisAccount | null> {
   return got[ACCOUNT_KEY]?.account ?? null;
 }
 
-export async function writeAccount(account: LimerisAccount | null): Promise<void> {
-  await chrome.storage.local.set({ [ACCOUNT_KEY]: { account } });
+/** `notice` dit pourquoi l'extension n'est plus connectée quand l'utilisateur ne l'a pas demandé. */
+export async function writeAccount(account: LimerisAccount | null, notice: AccountNotice | null = null): Promise<void> {
+  await chrome.storage.local.set({ [ACCOUNT_KEY]: { account, notice } });
 }
 
 interface BindableStore<S> {

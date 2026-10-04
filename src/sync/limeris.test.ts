@@ -28,6 +28,11 @@ describe('parseConnectMessage', () => {
     });
   });
 
+  it("garde l'identifiant du compte quand la page le donne", () => {
+    expect(parseConnectMessage({ type: MSG_CONNECT, token: TOKEN, pseudo: 'Sliver91', accountId: 'compte-42' }, 0)?.accountId).toBe('compte-42');
+    expect(parseConnectMessage({ type: MSG_CONNECT, token: TOKEN, accountId: 42 }, 0)).not.toHaveProperty('accountId');
+  });
+
   it('refuse un message mal formé', () => {
     expect(parseConnectMessage(null, 0)).toBeNull();
     expect(parseConnectMessage({ type: 'autre', token: TOKEN }, 0)).toBeNull();

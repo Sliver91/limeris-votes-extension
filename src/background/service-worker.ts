@@ -1,6 +1,19 @@
-import { checkUser, type VoteUserStatus } from '../azuriom/client';
+import { checkUser, confirmVote, type VoteUserStatus } from '../azuriom/client';
 import { appendHistory, readAccount, readData, reviveData, STATE_KEY, writeAccount, writeData } from '../store/chromeStorage';
-import { isLimerisSender, MSG_CONNECT, MSG_PING, parseConnectMessage, syncNow } from '../sync/limeris';
+import { BRIDGE_ERR, findServer, findSite } from '../sync/bridge';
+import {
+  isLimerisSender,
+  MSG_CHECK,
+  MSG_CONFIRM,
+  MSG_CONNECT,
+  MSG_OPEN,
+  MSG_PING,
+  parseConnectMessage,
+  SYNC_ERR,
+  SYNC_KEY,
+  syncNow,
+} from '../sync/limeris';
+import { syncFingerprint } from '../sync/wire';
 import { applyStatus, setServerError, type VoteServer, type VoteSound } from '../store/types';
 import { checkServers, countAvailable, nextDeadline, type Notice } from './engine';
 
@@ -100,20 +113,85 @@ async function refreshAll() {
   await check();
 }
 
+/** Empreinte des données au dernier échange réussi : sert à savoir s'il y a du nouveau à envoyer. */
+const FINGERPRINT_KEY = 'syncFingerprint';
+/** Délai après un changement avant de l'envoyer : regroupe ceux qui se suivent (vote + relecture). */
+const SYNC_DELAY_MS = 2_500;
+
+let syncing = false;
+let syncTimer: ReturnType<typeof setTimeout> | undefined;
+
 /**
- * Échange avec le compte limeris.fr quand l'extension y est connectée. Un échec (pas de réseau,
- * jeton révoqué) ne bloque rien : l'essai suivant, ou le bouton « Synchroniser », le dira.
+ * Échange avec le compte limeris.fr quand l'extension y est connectée. Un échec passager (pas de
+ * réseau, site indisponible) ne bloque rien : l'essai suivant, ou le bouton « Synchroniser », le dira.
+ * Un jeton refusé déconnecte l'extension : le garder ne ferait que répéter la même erreur.
  */
 async function syncAccount() {
+  if (syncing) return;
   const account = await readAccount();
   if (!account) return;
+  syncing = true;
   try {
     await syncNow(account);
     // Relecture : l'utilisateur a pu se déconnecter ou se reconnecter pendant l'échange.
     const current = await readAccount();
     if (current?.connectedAt === account.connectedAt) await writeAccount({ ...current, lastSyncAt: Date.now() });
+    await chrome.storage.session.set({ [FINGERPRINT_KEY]: syncFingerprint(await readData()) });
   } catch (e) {
-    console.warn('[limeris-votes] synchronisation impossible :', e);
+    if (String(e).includes(SYNC_ERR.TOKEN)) {
+      const current = await readAccount();
+      if (current?.connectedAt === account.connectedAt) {
+        await writeAccount(null, 'revoked');
+        await chrome.storage.local.remove(SYNC_KEY);
+      }
+    } else {
+      console.warn('[limeris-votes] synchronisation impossible :', e);
+    }
+  } finally {
+    syncing = false;
+  }
+}
+
+/** Un changement local (vote, serveur ajouté, paramètre) part vers le compte peu après. */
+function scheduleSync() {
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(async () => {
+    if (!(await readAccount())) return;
+    const known = (await chrome.storage.session.get(FINGERPRINT_KEY))[FINGERPRINT_KEY];
+    // Rien à envoyer si les données sont celles du dernier échange (c'est lui qui vient d'écrire).
+    if (syncFingerprint(await readData()) !== known) syncAccount();
+  }, SYNC_DELAY_MS);
+}
+
+/** Relit les délais d'un serveur suivi, à la demande de la page limeris.fr/votes. */
+async function bridgeCheck(message: { baseUrl?: unknown }) {
+  const data = await readData();
+  const server = findServer(data.servers, message.baseUrl);
+  if (!server) return { ok: false, error: BRIDGE_ERR.UNKNOWN_SERVER };
+  try {
+    const status = await checkUser(server.baseUrl, server.pseudo);
+    const fresh = await readData();
+    await writeData({ ...fresh, servers: applyStatus(fresh.servers, server.id, status.sites, status.votes, Date.now()) });
+    return { ok: true, result: status };
+  } catch (e) {
+    return { ok: false, error: String(e instanceof Error ? e.message : e) };
+  }
+}
+
+/** Demande au site d'un serveur suivi si un vote est validé, à la demande de la page limeris.fr/votes. */
+async function bridgeConfirm(message: { baseUrl?: unknown; voteUrl?: unknown; gameServer?: unknown }) {
+  const data = await readData();
+  const server = findServer(data.servers, message.baseUrl);
+  const site = server && findSite(server, message.voteUrl);
+  if (!server || !site) return { ok: false, error: BRIDGE_ERR.UNKNOWN_SERVER };
+  if (message.gameServer !== undefined && typeof message.gameServer !== 'string') return { ok: false, error: BRIDGE_ERR.BAD_REQUEST };
+  try {
+    const result = await confirmVote(server.baseUrl, site.voteUrl, server.pseudo, message.gameServer);
+    // Vote validé : les délais de l'extension suivent tout de suite, sans attendre la relecture régulière.
+    if (result.status === 'done') void bridgeCheck({ baseUrl: server.baseUrl });
+    return { ok: true, result };
+  } catch (e) {
+    return { ok: false, error: String(e instanceof Error ? e.message : e) };
   }
 }
 
@@ -154,6 +232,7 @@ chrome.runtime.onStartup.addListener(() => {
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'local' || !(STATE_KEY in changes)) return;
   updateSurface(reviveData(changes[STATE_KEY].newValue).servers, Date.now());
+  scheduleSync();
 });
 
 chrome.notifications.onClicked.addListener(async (id) => {
@@ -168,12 +247,18 @@ chrome.notifications.onClicked.addListener(async (id) => {
 });
 
 // Messages de la page limeris.fr (seules ses pages peuvent en envoyer, voir le manifeste ; l'origine
-// est revérifiée ici). `ping` lui dit si l'extension est là, `connect` lui remet le jeton du compte.
+// est revérifiée ici). `ping` lui dit si l'extension est là, `connect` lui remet le jeton du compte,
+// `open` affiche l'outil, `check` et `confirm` interrogent le site d'un serveur déjà suivi.
 chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
   if (!isLimerisSender(sender)) return;
   if (message?.type === MSG_PING) {
     readAccount().then((account) =>
-      sendResponse({ ok: true, version: chrome.runtime.getManifest().version, connected: account !== null })
+      sendResponse({
+        ok: true,
+        version: chrome.runtime.getManifest().version,
+        connected: account !== null,
+        accountId: account?.accountId ?? null,
+      })
     );
     return true;
   }
@@ -188,6 +273,18 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
       // Premier échange tout de suite : les serveurs de l'appareil arrivent sur limeris.fr/votes.
       syncAccount();
     });
+    return true;
+  }
+  if (message?.type === MSG_OPEN) {
+    showPanel().then(() => sendResponse({ ok: true }));
+    return true;
+  }
+  if (message?.type === MSG_CHECK) {
+    bridgeCheck(message).then(sendResponse);
+    return true;
+  }
+  if (message?.type === MSG_CONFIRM) {
+    bridgeConfirm(message).then(sendResponse);
     return true;
   }
 });
