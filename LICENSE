@@ -1,0 +1,39 @@
+Limeris VOTES
+Copyright © 2026 Sliver91 — Limeris (https://limeris.fr). Tous droits réservés.
+
+Ce logiciel, son code source, son interface, son nom et son logo sont la
+propriété exclusive de Sliver91.
+
+Il est interdit, sans l'accord écrit préalable de l'auteur :
+
+  - de copier, reproduire ou republier tout ou partie de ce logiciel ;
+  - de le modifier, de l'adapter ou d'en créer des œuvres dérivées ;
+  - de le redistribuer, le vendre, le louer ou le proposer sous un autre nom ;
+  - de l'utiliser, en tout ou en partie, dans un autre projet.
+
+La seule utilisation autorisée est l'installation et l'usage personnel de
+l'extension telle qu'elle est distribuée par l'auteur.
+
+La mise à disposition de ce dépôt ne vaut pas licence : aucune licence libre
+ou open source n'est accordée, ni expressément ni implicitement.
+
+Les sons de notification livrés dans public/sounds, ainsi que les bibliothèques
+tierces utilisées (React, Zustand, Lucide, Tailwind CSS, IBM Plex Mono…),
+restent la propriété de leurs auteurs respectifs et sont soumis à leurs
+propres conditions.
+
+CE LOGICIEL EST FOURNI « EN L'ÉTAT », SANS GARANTIE D'AUCUNE SORTE. L'AUTEUR
+NE POURRA ÊTRE TENU RESPONSABLE D'AUCUN DOMMAGE LIÉ À SON UTILISATION.
+
+Contact : https://limeris.fr
+
+--------------------------------------------------------------------------------
+
+Limeris VOTES
+Copyright © 2026 Sliver91 — Limeris (https://limeris.fr). All rights reserved.
+
+This software, its source code, interface, name and logo are the exclusive
+property of Sliver91. No part of it may be copied, modified, redistributed,
+sold or reused in another project without the author's prior written
+permission. No open-source license is granted. Third-party sounds and
+libraries remain the property of their respective owners.

@@ -1,0 +1,310 @@
+import { useMemo, useState } from 'react';
+import { Card } from './components/Card';
+import { useVoteHistoryStore, useVoteStore, type VoteEvent } from '../store/store';
+
+type Period = 'prev' | 'cur' | '30';
+const DAY_MS = 86_400_000;
+
+interface Counts {
+  votes: number;
+  chances: number;
+}
+
+interface PeriodStats extends Counts {
+  /** Votes validés à la main, sans confirmation du site du serveur. */
+  manual: number;
+  days: Map<number, Counts>;
+  hours: number[];
+  sites: Map<string, Counts>;
+}
+
+function startOfDay(t: number): number {
+  const d = new Date(t);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
+function monthName(t: number): string {
+  return new Date(t).toLocaleDateString('fr-FR', { month: 'long' });
+}
+
+function periodRange(period: Period, now: number) {
+  const d = new Date(now);
+  const y = d.getFullYear();
+  const m = d.getMonth();
+  const monthStart = new Date(y, m, 1).getTime();
+  if (period === 'cur') {
+    const prevStart = new Date(y, m - 1, 1).getTime();
+    return { from: monthStart, to: now, prevFrom: prevStart, prevTo: prevStart + (now - monthStart) };
+  }
+  if (period === 'prev') {
+    const from = new Date(y, m - 1, 1).getTime();
+    return { from, to: monthStart, prevFrom: new Date(y, m - 2, 1).getTime(), prevTo: from };
+  }
+  const from = startOfDay(now - 29 * DAY_MS);
+  return { from, to: now, prevFrom: from - 30 * DAY_MS, prevTo: from };
+}
+
+function compute(events: VoteEvent[], serverId: string | null, from: number, to: number): PeriodStats {
+  const stats: PeriodStats = { votes: 0, chances: 0, manual: 0, days: new Map(), hours: Array(24).fill(0), sites: new Map() };
+  // Le saut de +26 h avant de retomber sur minuit absorbe les jours de 23 h ou 25 h (changement d'heure).
+  for (let day = startOfDay(from); day < to; day = startOfDay(day + DAY_MS + 2 * 3_600_000)) {
+    stats.days.set(day, { votes: 0, chances: 0 });
+  }
+  for (const e of events) {
+    if (e.t < from || e.t >= to || (serverId && e.serverId !== serverId)) continue;
+    const day = stats.days.get(startOfDay(e.t));
+    const site = stats.sites.get(e.host) ?? { votes: 0, chances: 0 };
+    stats.sites.set(e.host, site);
+    if (e.kind === 'v') {
+      stats.votes += 1;
+      if (e.manual) stats.manual += 1;
+      site.votes += 1;
+      if (day) day.votes += 1;
+      stats.hours[new Date(e.t).getHours()] += 1;
+    } else {
+      stats.chances += 1;
+      site.chances += 1;
+      if (day) day.chances += 1;
+    }
+  }
+  return stats;
+}
+
+/** Votes faits ÷ nombre de fois où un site est redevenu disponible. */
+function successRate(c: Counts): number {
+  const total = Math.max(c.chances, c.votes);
+  return total ? Math.round((100 * c.votes) / total) : 0;
+}
+
+function missed(c: Counts): number {
+  return Math.max(0, c.chances - c.votes);
+}
+
+function niceMax(n: number): number {
+  return [4, 6, 8, 10, 20, 30, 40, 50, 60, 80, 100, 200, 400, 600, 1000].find((x) => x >= n) ?? Math.ceil(n / 1000) * 1000;
+}
+
+interface Bar {
+  value: number;
+  label: string;
+  tip: string;
+}
+
+function BarChart({ bars, ariaLabel }: { bars: Bar[]; ariaLabel: string }) {
+  const [hover, setHover] = useState<number | null>(null);
+  const W = 640;
+  const H = 180;
+  const L = 30;
+  const R = 6;
+  const T = 26;
+  const B = 22;
+  const innerW = W - L - R;
+  const innerH = H - T - B;
+  const max = niceMax(Math.max(1, ...bars.map((b) => b.value)));
+  const step = innerW / bars.length;
+  const barW = Math.max(2, Math.min(24, step - 2));
+
+  return (
+    <div className="relative" onMouseLeave={() => setHover(null)}>
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={ariaLabel} className="block h-auto w-full">
+        {[0, max / 2, max].map((v) => {
+          const y = T + innerH - (v / max) * innerH;
+          return (
+            <g key={v}>
+              <line x1={L} x2={W - R} y1={y} y2={y} className="stroke-border" strokeWidth={1} />
+              <text x={L - 6} y={y + 3} textAnchor="end" className="fill-text-muted font-mono text-[10px]">
+                {v}
+              </text>
+            </g>
+          );
+        })}
+        {bars.map((bar, i) => {
+          const x = L + i * step + (step - barW) / 2;
+          const h = (bar.value / max) * innerH;
+          const y = T + innerH - h;
+          const r = Math.min(4, barW / 2, h);
+          return (
+            <g key={i}>
+              {h > 0 && (
+                <path
+                  d={`M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + barW - r}Q${x + barW},${y} ${x + barW},${y + r}V${y + h}Z`}
+                  className="fill-accent"
+                  opacity={hover === i ? 1 : 0.85}
+                />
+              )}
+              {bar.label && (
+                <text x={x + barW / 2} y={H - 6} textAnchor="middle" className="fill-text-muted font-mono text-[10px]">
+                  {bar.label}
+                </text>
+              )}
+              <rect x={L + i * step} y={T} width={step} height={innerH} fill="transparent" onMouseEnter={() => setHover(i)}>
+                <title>{bar.tip}</title>
+              </rect>
+            </g>
+          );
+        })}
+      </svg>
+      {hover !== null && (
+        <div
+          className="pointer-events-none absolute top-0 -translate-x-1/2 whitespace-nowrap rounded-md border border-border bg-surface px-2 py-1 text-xs text-text shadow-sm"
+          style={{ left: `${Math.min(86, Math.max(14, (100 * (L + (hover + 0.5) * step)) / W))}%` }}
+        >
+          {bars[hover].tip}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function StatsTab() {
+  const events = useVoteHistoryStore((s) => s.events);
+  const servers = useVoteStore((s) => s.servers);
+  const currentId = useVoteStore((s) => s.currentId);
+  const [period, setPeriod] = useState<Period>('cur');
+  const [scope, setScope] = useState<string>(currentId ?? 'all');
+
+  const serverId = scope === 'all' ? null : scope;
+  const now = Date.now();
+  const range = periodRange(period, now);
+  const stats = useMemo(() => compute(events, serverId, range.from, range.to), [events, serverId, range.from, range.to]);
+  const previous = useMemo(
+    () => compute(events, serverId, range.prevFrom, range.prevTo),
+    [events, serverId, range.prevFrom, range.prevTo]
+  );
+
+  const prevMonthStart = new Date(new Date(now).getFullYear(), new Date(now).getMonth() - 1, 1).getTime();
+  // `short` : libellé utilisé quand l'écran est étroit (panneau latéral), pour tenir sur une ligne.
+  const periods: { id: Period; label: string; short: string }[] = [
+    { id: 'cur', label: `Ce mois (${monthName(now)})`, short: monthName(now) },
+    { id: 'prev', label: `Mois dernier (${monthName(prevMonthStart)})`, short: monthName(prevMonthStart) },
+    { id: '30', label: '30 derniers jours', short: '30 jours' },
+  ];
+
+  const days = [...stats.days.entries()];
+  const fewDays = days.length <= 10;
+  const dayBars: Bar[] = days.map(([day, c]) => {
+    const date = new Date(day);
+    const n = date.getDate();
+    const name = date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
+    return { value: c.votes, label: fewDays || n === 1 || n % 5 === 0 ? String(n) : '', tip: `${name} : ${c.votes} votés, ${missed(c)} manqués` };
+  });
+  const hourBars: Bar[] = stats.hours.map((v, h) => ({
+    value: v,
+    label: h % 3 === 0 ? `${h} h` : '',
+    tip: `${h} h – ${h + 1} h : ${v} vote${v > 1 ? 's' : ''}`,
+  }));
+  const bestHour = stats.hours.indexOf(Math.max(...stats.hours));
+  const diff = stats.votes - previous.votes;
+  const sites = [...stats.sites.entries()].sort((a, b) => b[1].votes - a[1].votes);
+
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+        {periods.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => setPeriod(p.id)}
+            aria-pressed={period === p.id}
+            aria-label={p.label}
+            className={`rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors sm:px-3 ${
+              period === p.id ? 'border-accent bg-accent-soft text-text' : 'border-border text-text-muted hover:text-text'
+            }`}
+          >
+            <span className="capitalize sm:hidden">{p.short}</span>
+            <span className="hidden sm:inline">{p.label}</span>
+          </button>
+        ))}
+        {servers.length > 1 && (
+          <select
+            value={scope}
+            onChange={(e) => setScope(e.target.value)}
+            aria-label="Serveur"
+            className="ml-auto rounded-lg border border-border bg-surface px-2 py-1.5 text-xs text-text"
+          >
+            <option value="all">Tous les serveurs</option>
+            {servers.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      <Card className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div>
+          <p className="text-2xl font-semibold tabular-nums text-text">{stats.votes}</p>
+          <p className="text-xs text-text-muted">
+            votes · {diff >= 0 ? '+' : '−'}
+            {Math.abs(diff)} par rapport à la période d'avant
+          </p>
+        </div>
+        <div>
+          <p className="text-2xl font-semibold tabular-nums text-text">{successRate(stats)} %</p>
+          <p className="text-xs text-text-muted">de réussite (votes faits ÷ rappels reçus)</p>
+        </div>
+        <div>
+          <p className="text-2xl font-semibold tabular-nums text-text">{missed(stats)}</p>
+          <p className="text-xs text-text-muted">votes manqués</p>
+        </div>
+        <div>
+          <p className="text-2xl font-semibold tabular-nums text-text">{stats.manual}</p>
+          <p className="text-xs text-text-muted">dont validés à la main</p>
+        </div>
+      </Card>
+
+      {stats.votes + stats.chances === 0 ? (
+        <Card>
+          <p className="text-sm text-text-muted">
+            Rien sur cette période. Les statistiques se remplissent au fil de tes votes faits depuis l'extension.
+          </p>
+        </Card>
+      ) : (
+        <>
+          <div className="grid gap-4 md:grid-cols-5">
+            <Card className="md:col-span-3">
+              <h2 className="mb-2 text-sm font-semibold text-text">Votes par jour</h2>
+              <BarChart bars={dayBars} ariaLabel="Votes par jour" />
+            </Card>
+            <Card className="md:col-span-2">
+              <h2 className="mb-2 text-sm font-semibold text-text">Heures où je vote le plus</h2>
+              <BarChart bars={hourBars} ariaLabel="Votes par heure de la journée" />
+              {stats.votes > 0 && (
+                <p className="mt-2 text-xs text-text-muted">
+                  Surtout entre {bestHour} h et {bestHour + 1} h.
+                </p>
+              )}
+            </Card>
+          </div>
+
+          <Card>
+            <h2 className="mb-2 text-sm font-semibold text-text">Par site de vote</h2>
+            <table className="w-full text-sm tabular-nums">
+              <thead>
+                <tr className="text-xs text-text-muted">
+                  <th className="py-1 text-left font-medium">Site</th>
+                  <th className="py-1 text-right font-medium">Votés</th>
+                  <th className="py-1 text-right font-medium">Manqués</th>
+                  <th className="py-1 text-right font-medium">Réussite</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {sites.map(([host, c]) => (
+                  <tr key={host}>
+                    <td className="break-all py-1.5 text-text">{host}</td>
+                    <td className="py-1.5 text-right text-text">{c.votes}</td>
+                    <td className="py-1.5 text-right text-text">{missed(c)}</td>
+                    <td className="py-1.5 text-right text-text">{successRate(c)} %</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+        </>
+      )}
+    </div>
+  );
+}
