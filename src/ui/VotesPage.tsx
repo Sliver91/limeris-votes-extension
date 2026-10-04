@@ -443,7 +443,6 @@ function SettingsTab() {
         </p>
       </Card>
 
-      {host.extension === 'self' && (
       <Card className="flex min-w-0 items-center gap-3 md:col-span-2">
         <a href={SITE_URL} target="_blank" rel="noreferrer" title="Ouvrir limeris.fr" className="shrink-0">
           <img src={assetUrl('icons/128.png')} alt="Limeris" width={40} height={40} className="h-10 w-10 rounded-xl" />
@@ -458,7 +457,6 @@ function SettingsTab() {
           <p className="text-xs text-text-muted">© 2026 Sliver91. Tous droits réservés.</p>
         </div>
       </Card>
-      )}
     </div>
   );
 }
@@ -484,7 +482,7 @@ export function VotesPage() {
     <div className="mx-auto flex max-w-3xl flex-col gap-3 p-3 sm:gap-5 sm:p-4">
       <div>
         <div className="flex items-center justify-between gap-2">
-          {host.extension === 'self' ? <Brand /> : <h1 className="text-xl font-semibold text-text">Limeris votes</h1>}
+          <Brand />
           {/* Ferme le panneau latéral (ou l'onglet) : le bouton du navigateur n'est pas toujours visible. */}
           {host.closable && (
           <button
