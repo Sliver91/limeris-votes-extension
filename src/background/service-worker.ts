@@ -15,6 +15,7 @@ import {
 } from '../sync/limeris';
 import { syncFingerprint } from '../sync/wire';
 import { applyStatus, setServerError, type VoteServer, type VoteSound } from '../store/types';
+import { TEST_ALARM } from '../platform';
 import { checkServers, countAvailable, nextDeadline, type Notice } from './engine';
 
 /**
@@ -212,8 +213,23 @@ async function showPanel() {
   if (open.windowId >= 0) await chrome.windows.update(open.windowId, { focused: true });
 }
 
+/** Notification d'essai demandée depuis les Paramètres : même chemin qu'un vrai rappel, son compris. */
+async function testNotification() {
+  const { settings } = await readData();
+  const id = `${NOTIFICATION_PREFIX}test`;
+  await chrome.notifications.clear(id);
+  await chrome.notifications.create(id, {
+    type: 'basic',
+    iconUrl: chrome.runtime.getURL('icons/128.png'),
+    title: 'Test de notification',
+    message: 'Les rappels de Limeris votes fonctionnent sur cet appareil.',
+  });
+  if (settings.sound) await playSound(settings.soundKind, settings.volume);
+}
+
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === REFRESH_ALARM) refreshAll().then(syncAccount);
+  else if (alarm.name === TEST_ALARM) testNotification();
   else check();
 });
 

@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { BarChart3, Plus, RefreshCw, Settings2, Vote, X } from 'lucide-react';
+import { BarChart3, BellRing, Plus, RefreshCw, Settings2, Vote, X } from 'lucide-react';
 import { Card } from './components/Card';
 import { Button } from './components/Button';
 import { Switch } from './components/Switch';
 import { normalizeBase } from '../azuriom/parse';
 import { ERR } from '../azuriom/errors';
 import { playSound, SOUNDS } from '../lib/sound';
-import { appVersion, assetUrl, onPendingQueue, onPendingTab, openExtension, openExternal, requestSiteAccess, takePendingQueue, takePendingTab, useHost } from '../platform';
+import { appVersion, assetUrl, scheduleTestNotification, onPendingQueue, onPendingTab, openExtension, openExternal, requestSiteAccess, takePendingQueue, takePendingTab, useHost } from '../platform';
 import { AccountSection } from '../account/AccountSection';
 import { formatLeft, relativeTime } from './format';
 import { describeVoteError, importServer, refreshServer } from './api';
@@ -306,6 +306,30 @@ function VotesTab() {
   );
 }
 
+/** Envoie une notification d'essai dans 30 secondes, pour vérifier que les rappels arrivent bien. */
+function TestNotification() {
+  const now = useNow();
+  const [due, setDue] = useState<number | null>(null);
+  const left = due === null ? 0 : Math.ceil((due - now) / 1000);
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div>
+        <Button variant="secondary" disabled={due !== null && left > 0} onClick={async () => setDue(await scheduleTestNotification())}>
+          <BellRing size={14} /> {due !== null && left > 0 ? `Notification dans ${left} s` : 'Tester une notification dans 30 s'}
+        </Button>
+      </div>
+      {due !== null && (
+        <p className="text-xs text-text-muted">
+          {left > 0
+            ? 'Tu peux fermer cet écran : elle arrivera quand même, avec le son choisi.'
+            : "Notification envoyée. Si tu n'as rien vu, vérifie que les notifications de ton navigateur sont autorisées dans Windows, et que le mode « Ne pas déranger » de Windows est coupé."}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function SettingsTab() {
   const settings = useVoteStore((s) => s.settings);
   const update = useVoteStore((s) => s.updateSettings);
@@ -411,6 +435,7 @@ function SettingsTab() {
             className="min-w-0 max-w-40 flex-1 disabled:opacity-50"
           />
         </label>
+        {host.extension === 'self' && <TestNotification />}
         <p className="text-xs text-text-muted">
           {host.extension === 'self'
             ? 'Les rappels arrivent tant que le navigateur est ouvert, même sans cet écran.'

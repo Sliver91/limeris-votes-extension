@@ -34,6 +34,20 @@ export function assetUrl(file: string): string {
   return chrome.runtime.getURL(file);
 }
 
+/** Nom du réveil qui déclenche la notification d'essai (voir service-worker.ts). */
+export const TEST_ALARM = 'test-notification';
+export const TEST_DELAY_MS = 30_000;
+
+/**
+ * Programme une notification d'essai, envoyée par le service worker comme un vrai rappel : elle
+ * arrive même si cet écran est fermé entre-temps. Renvoie l'heure prévue.
+ */
+export async function scheduleTestNotification(): Promise<number> {
+  const when = Date.now() + TEST_DELAY_MS;
+  await chrome.alarms.create(TEST_ALARM, { when });
+  return when;
+}
+
 /** Sans objet dans l'extension : sert à la page limeris.fr/votes pour ouvrir ou proposer l'extension. */
 export function openExtension(): void {}
 
