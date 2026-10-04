@@ -20,6 +20,8 @@ export function reviveData(saved: Partial<VoteData> | undefined): VoteData {
     servers: saved?.servers ?? [],
     currentId: saved?.currentId ?? null,
     settings,
+    settingsAt: saved?.settingsAt,
+    removed: saved?.removed ?? [],
   };
 }
 

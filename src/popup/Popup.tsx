@@ -21,7 +21,7 @@ export function Popup() {
   const now = useNow();
 
   // Connu d'avance : l'ouverture du panneau doit partir directement du clic, sans attente.
-  const windowId = useRef<number>();
+  const windowId = useRef<number | undefined>(undefined);
   useEffect(() => {
     chrome.windows.getCurrent().then((w) => (windowId.current = w.id));
   }, []);

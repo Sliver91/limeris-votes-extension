@@ -34,11 +34,11 @@ export const useVoteStore = create<VoteStoreState>()((set) => ({
   servers: [],
   currentId: null,
   settings: DEFAULT_SETTINGS,
-  addServer: (server) => set((s) => ({ servers: [...s.servers, server], currentId: server.id })),
+  addServer: (server) => set((s) => ({ servers: [...s.servers, { ...server, identityAt: Date.now() }], currentId: server.id })),
   removeServer: (id) =>
     set((s) => {
       const servers = s.servers.filter((x) => x.id !== id);
-      return { servers, currentId: s.currentId === id ? (servers[0]?.id ?? null) : s.currentId };
+      return { servers, removed: [...(s.removed ?? []), id], currentId: s.currentId === id ? (servers[0]?.id ?? null) : s.currentId };
     }),
   setCurrent: (currentId) => set({ currentId }),
   setServerError: (id, error) => set((s) => ({ servers: setServerError(s.servers, id, error) })),
@@ -46,7 +46,7 @@ export const useVoteStore = create<VoteStoreState>()((set) => ({
   patchSite: (serverId, siteId, patch) => set((s) => ({ servers: patchSite(s.servers, serverId, siteId, patch) })),
   validateManually: (serverId, siteId, delayMin) =>
     set((s) => ({ servers: validateManually(s.servers, serverId, siteId, delayMin, Date.now()) })),
-  updateSettings: (patch) => set((s) => ({ settings: { ...s.settings, ...patch } })),
+  updateSettings: (patch) => set((s) => ({ settings: { ...s.settings, ...patch }, settingsAt: Date.now() })),
 }));
 
 interface VoteHistoryState {
@@ -58,7 +58,7 @@ interface VoteHistoryState {
 /** Historique des votes, enregistré à part des réglages : il grossit avec le temps. */
 export const useVoteHistoryStore = create<VoteHistoryState>()((set) => ({
   events: [],
-  push: (event) => set((s) => ({ events: [...s.events, event].slice(-MAX_EVENTS) })),
+  push: (event) => set((s) => ({ events: [...s.events, { ...event, id: event.id ?? crypto.randomUUID() }].slice(-MAX_EVENTS) })),
   clear: () => set({ events: [] }),
 }));
 
@@ -84,7 +84,7 @@ export const storeReady: Promise<unknown> = Promise.all([
   bindStore<VoteStoreState, VoteData>(
     useVoteStore,
     STATE_KEY,
-    ({ servers, currentId, settings }) => ({ servers, currentId, settings }),
+    ({ servers, currentId, settings, settingsAt, removed }) => ({ servers, currentId, settings, settingsAt, removed }),
     reviveData
   ),
   bindStore<VoteHistoryState, { events: VoteEvent[] }>(

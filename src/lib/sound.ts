@@ -1,3 +1,4 @@
+import { assetUrl } from '../platform';
 import type { VoteSound } from '../store/types';
 
 /** Sons de rappel, livrés avec l'extension dans public/sounds, dans l'ordre de la liste des Réglages. */
@@ -19,7 +20,7 @@ export function playSound(sound: VoteSound, volume: number) {
 
   const file = SOUNDS.find((s) => s.id === sound)?.file;
   if (!file) return;
-  const audio = new Audio(chrome.runtime.getURL(file));
+  const audio = new Audio(assetUrl(file));
   audio.volume = Math.min(1, volume);
   playing = audio;
   audio.play().catch(() => {});

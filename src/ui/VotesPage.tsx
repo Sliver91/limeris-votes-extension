@@ -6,7 +6,8 @@ import { Switch } from './components/Switch';
 import { normalizeBase } from '../azuriom/parse';
 import { ERR } from '../azuriom/errors';
 import { playSound, SOUNDS } from '../lib/sound';
-import { onPendingQueue, onPendingTab, openExternal, requestSiteAccess, takePendingQueue, takePendingTab } from '../platform';
+import { appVersion, assetUrl, onPendingQueue, onPendingTab, openExtension, openExternal, requestSiteAccess, takePendingQueue, takePendingTab, useHost } from '../platform';
+import { AccountSection } from '../account/AccountSection';
 import { formatLeft, relativeTime } from './format';
 import { describeVoteError, importServer, refreshServer } from './api';
 import { isAvailable, useVoteStore, type OpenMode, type VoteServer, type VoteSound } from '../store/store';
@@ -15,7 +16,6 @@ import { VoteQueue } from './VoteQueue';
 import { StatsTab } from './StatsTab';
 import { CopyPseudoButton } from './CopyPseudoButton';
 import { Brand, SITE_URL, SiteLink } from './Brand';
-import { AccountCard } from './AccountCard';
 
 type Tab = 'votes' | 'stats' | 'settings';
 
@@ -109,6 +109,31 @@ function AddServerForm({ onDone, onCancel }: { onDone: () => void; onCancel?: ()
   );
 }
 
+/** Affiché à la place du formulaire d'ajout quand l'hôte ne peut pas lire le site d'un serveur. */
+function ExtensionNeeded({ onCancel }: { onCancel?: () => void }) {
+  const host = useHost();
+  const installed = host.extension === 'installed';
+  return (
+    <Card className="flex flex-col gap-3">
+      <h2 className="text-sm font-semibold text-text">Ajouter un serveur</h2>
+      <p className="text-sm text-text-muted">
+        L'ajout d'un serveur se fait depuis l'extension Limeris votes : c'est elle qui lit la page de vote du serveur,
+        depuis ton navigateur. Une fois connectée à ton compte, tes serveurs apparaissent ici tout seuls.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" onClick={openExtension}>
+          {installed ? "Ouvrir l'extension" : "Installer l'extension"}
+        </Button>
+        {onCancel && (
+          <Button type="button" variant="ghost" onClick={onCancel}>
+            Annuler
+          </Button>
+        )}
+      </div>
+    </Card>
+  );
+}
+
 function RemoveServerButton({ server }: { server: VoteServer }) {
   const removeServer = useVoteStore((s) => s.removeServer);
   const [confirming, setConfirming] = useState(false);
@@ -134,6 +159,7 @@ function VotesTab() {
   const currentId = useVoteStore((s) => s.currentId);
   const setCurrent = useVoteStore((s) => s.setCurrent);
   const now = useNow();
+  const host = useHost();
   const [adding, setAdding] = useState(false);
   const [queue, setQueue] = useState<string[] | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -157,6 +183,9 @@ function VotesTab() {
 
   const server = servers.find((s) => s.id === currentId) ?? servers[0];
 
+  if ((!server || adding) && !host.addServers) {
+    return <ExtensionNeeded onCancel={server ? () => setAdding(false) : undefined} />;
+  }
   if (!server || adding) {
     return <AddServerForm onDone={() => setAdding(false)} onCancel={server ? () => setAdding(false) : undefined} />;
   }
@@ -263,9 +292,11 @@ function VotesTab() {
               {server.lastCheckedAt && <span>· vérifié {relativeTime(server.lastCheckedAt, now)}</span>}
             </span>
             <span className="flex items-center gap-4">
-              <button type="button" onClick={refresh} disabled={refreshing} className="flex items-center gap-1 hover:text-text">
-                <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} /> Actualiser
-              </button>
+              {host.refresh && (
+                <button type="button" onClick={refresh} disabled={refreshing} className="flex items-center gap-1 hover:text-text">
+                  <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} /> Actualiser
+                </button>
+              )}
               <RemoveServerButton server={server} />
             </span>
           </div>
@@ -278,6 +309,7 @@ function VotesTab() {
 function SettingsTab() {
   const settings = useVoteStore((s) => s.settings);
   const update = useVoteStore((s) => s.updateSettings);
+  const host = useHost();
   const modes: { id: OpenMode; label: string }[] = [
     { id: 'tab', label: 'Nouvel onglet' },
     { id: 'window', label: 'Petite fenêtre' },
@@ -285,7 +317,7 @@ function SettingsTab() {
 
   return (
     <div className="grid gap-3 sm:gap-4 md:grid-cols-2">
-      <AccountCard />
+      <AccountSection />
 
       <Card className="flex min-w-0 flex-col gap-3">
         <h2 className="text-sm font-semibold text-text">Rappels</h2>
@@ -379,7 +411,11 @@ function SettingsTab() {
             className="min-w-0 max-w-40 flex-1 disabled:opacity-50"
           />
         </label>
-        <p className="text-xs text-text-muted">Les rappels arrivent tant que le navigateur est ouvert, même sans cet écran.</p>
+        <p className="text-xs text-text-muted">
+          {host.extension === 'self'
+            ? 'Les rappels arrivent tant que le navigateur est ouvert, même sans cet écran.'
+            : "Les rappels sont envoyés par l'extension Limeris votes, dans les navigateurs où elle est connectée à ton compte."}
+        </p>
       </Card>
 
       <Card className="flex min-w-0 flex-col gap-3">
@@ -407,13 +443,14 @@ function SettingsTab() {
         </p>
       </Card>
 
+      {host.extension === 'self' && (
       <Card className="flex min-w-0 items-center gap-3 md:col-span-2">
         <a href={SITE_URL} target="_blank" rel="noreferrer" title="Ouvrir limeris.fr" className="shrink-0">
-          <img src="icons/128.png" alt="Limeris" width={40} height={40} className="h-10 w-10 rounded-xl" />
+          <img src={assetUrl('icons/128.png')} alt="Limeris" width={40} height={40} className="h-10 w-10 rounded-xl" />
         </a>
         <div className="min-w-0">
           <p className="text-sm font-semibold text-text">
-            Limeris votes <span className="font-mono text-xs font-normal text-text-muted">v{chrome.runtime.getManifest().version}</span>
+            Limeris votes <span className="font-mono text-xs font-normal text-text-muted">v{appVersion()}</span>
           </p>
           <p className="text-xs text-text-muted">
             Développé par <span className="font-medium text-text">Sliver91</span> · <SiteLink />
@@ -421,12 +458,14 @@ function SettingsTab() {
           <p className="text-xs text-text-muted">© 2026 Sliver91. Tous droits réservés.</p>
         </div>
       </Card>
+      )}
     </div>
   );
 }
 
 export function VotesPage() {
   const [tab, setTab] = useState<Tab>('votes');
+  const host = useHost();
 
   // Une file demandée depuis la fenêtre de l'icône ramène sur l'onglet Votes, qui la lance.
   useEffect(() => onPendingQueue(() => setTab('votes')), []);
@@ -445,8 +484,9 @@ export function VotesPage() {
     <div className="mx-auto flex max-w-3xl flex-col gap-3 p-3 sm:gap-5 sm:p-4">
       <div>
         <div className="flex items-center justify-between gap-2">
-          <Brand />
+          {host.extension === 'self' ? <Brand /> : <h1 className="text-xl font-semibold text-text">Limeris votes</h1>}
           {/* Ferme le panneau latéral (ou l'onglet) : le bouton du navigateur n'est pas toujours visible. */}
+          {host.closable && (
           <button
             type="button"
             onClick={() => window.close()}
@@ -456,6 +496,7 @@ export function VotesPage() {
           >
             <X size={14} /> Fermer
           </button>
+          )}
         </div>
         {/* La phrase de présentation prendrait quatre lignes dans le panneau latéral. */}
         <p className="mt-2 hidden text-sm text-text-muted sm:block">

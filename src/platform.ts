@@ -1,7 +1,41 @@
 import { ERR } from './azuriom/errors';
 import type { OpenMode } from './store/types';
 
-/** Ce que l'extension demande au navigateur depuis ses écrans — l'équivalent de tauriBridge.ts. */
+/**
+ * Ce que les écrans demandent à leur hôte. Ici, l'hôte est l'extension ; la page limeris.fr/votes
+ * reprend les mêmes écrans (src/ui) avec son propre fichier platform.ts.
+ */
+
+export interface Host {
+  /** L'hôte peut lire le site d'un serveur pour l'ajouter. */
+  addServers: boolean;
+  /** L'hôte peut demander au site du serveur si un vote est validé. */
+  confirm: boolean;
+  /** L'hôte peut relire les délais sur le site du serveur. */
+  refresh: boolean;
+  /** L'écran peut se fermer lui-même (panneau latéral, onglet de l'extension). */
+  closable: boolean;
+  /** 'self' : ces écrans sont ceux de l'extension. Sinon, sa présence dans le navigateur. */
+  extension: 'self' | 'installed' | 'missing';
+}
+
+const HOST: Host = { addServers: true, confirm: true, refresh: true, closable: true, extension: 'self' };
+
+export function useHost(): Host {
+  return HOST;
+}
+
+export function appVersion(): string {
+  return chrome.runtime.getManifest().version;
+}
+
+/** Adresse d'un fichier livré avec l'outil (icône, sons). */
+export function assetUrl(file: string): string {
+  return chrome.runtime.getURL(file);
+}
+
+/** Sans objet dans l'extension : sert à la page limeris.fr/votes pour ouvrir ou proposer l'extension. */
+export function openExtension(): void {}
 
 /** Onglet dans lequel s'ouvrent les sites de vote, réutilisé d'un site au suivant. */
 let voteTabId: number | null = null;

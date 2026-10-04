@@ -1,4 +1,4 @@
-import { isAvailable, type VoteData, type VoteEvent, type VoteServer } from '../store/types';
+import { isAvailable, openEventId, type VoteData, type VoteEvent, type VoteServer } from '../store/types';
 
 /** Vrai si l'heure tombe dans la plage de silence — qui peut passer minuit (23 h → 8 h). */
 export function isQuietHour(date: Date, from: number, to: number): boolean {
@@ -38,7 +38,7 @@ export function checkServers(data: VoteData, now: number): CheckResult {
     const sites = server.sites.map((site) => {
       if (!isAvailable(site, now)) return site;
       if (!site.notified) {
-        result.events.push({ t: now, serverId: server.id, host: site.host, kind: 'o' });
+        result.events.push({ id: openEventId(server.id, site.id, site.nextAt, now), t: now, serverId: server.id, host: site.host, siteId: site.id, kind: 'o' });
         fresh += 1;
         return { ...site, notified: true, lastRemindAt: now };
       }

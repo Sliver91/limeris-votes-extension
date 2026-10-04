@@ -1,3 +1,5 @@
+import { assetUrl } from '../platform';
+
 export const SITE_URL = 'https://limeris.fr';
 
 /** Lien vers le site de Limeris, ouvert dans un nouvel onglet. */
@@ -14,7 +16,7 @@ export function Brand() {
   return (
     <div className="flex min-w-0 items-center gap-2.5">
       <a href={SITE_URL} target="_blank" rel="noreferrer" title="Ouvrir limeris.fr" className="shrink-0">
-        <img src="icons/128.png" alt="Limeris" width={32} height={32} className="h-8 w-8 rounded-lg" />
+        <img src={assetUrl('icons/128.png')} alt="Limeris" width={32} height={32} className="h-8 w-8 rounded-lg" />
       </a>
       <div className="min-w-0 leading-tight">
         <h1 className="truncate text-sm font-semibold text-text">Limeris votes</h1>

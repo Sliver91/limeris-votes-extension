@@ -3,7 +3,7 @@ import { RefreshCw } from 'lucide-react';
 import { Card } from './components/Card';
 import { Button } from './components/Button';
 import { confirmVote } from '../azuriom/client';
-import { closeSite, openSite as openSiteTab } from '../platform';
+import { closeSite, openSite as openSiteTab, useHost } from '../platform';
 import { describeVoteError, refreshServer, siteLink } from './api';
 import { formatDelay } from './format';
 import { CopyPseudoButton, copyPseudo } from './CopyPseudoButton';
@@ -45,6 +45,8 @@ interface VoteQueueProps {
 /** Enchaîne les sites de vote un par un : ouvre le site, puis attend que le site du serveur confirme. */
 export function VoteQueue({ server, siteIds, onClose }: VoteQueueProps) {
   const settings = useVoteStore((s) => s.settings);
+  /** Faux quand l'hôte ne peut pas interroger le site du serveur : seul « J'ai voté » valide alors le vote. */
+  const canConfirm = useHost().confirm;
   const [index, setIndex] = useState(0);
   const [phase, setPhase] = useState<Phase>('waiting');
   const [message, setMessage] = useState<string | null>(null);
@@ -56,7 +58,7 @@ export function VoteQueue({ server, siteIds, onClose }: VoteQueueProps) {
   const [customHours, setCustomHours] = useState('');
   const [customMinutes, setCustomMinutes] = useState('');
 
-  const timer = useRef<number>();
+  const timer = useRef<number | undefined>(undefined);
   const openedAt = useRef(0);
   /** Change à chaque étape : une réponse arrivée après un changement d'étape est ignorée. */
   const runId = useRef(0);
@@ -123,6 +125,7 @@ export function VoteQueue({ server, siteIds, onClose }: VoteQueueProps) {
         t: Date.now(),
         serverId: current.id,
         host: target.host,
+        siteId: target.id,
         kind: 'v',
         reward: res.message ?? undefined,
       });
@@ -157,7 +160,7 @@ export function VoteQueue({ server, siteIds, onClose }: VoteQueueProps) {
     setGameServers(null);
     openedAt.current = Date.now();
     openSite(site);
-    timer.current = window.setTimeout(() => poll(site, run), POLL_INTERVAL_MS);
+    if (canConfirm) timer.current = window.setTimeout(() => poll(site, run), POLL_INTERVAL_MS);
     return () => {
       window.clearTimeout(timer.current);
       runId.current += 1;
@@ -211,7 +214,7 @@ export function VoteQueue({ server, siteIds, onClose }: VoteQueueProps) {
     useVoteStore.getState().validateManually(server.id, site.id, manualDelay);
     // Si le site du serveur a confirmé entre-temps, le vote est déjà compté : seul le délai change.
     if (!serverConfirmed) {
-      useVoteHistoryStore.getState().push({ t: Date.now(), serverId: server.id, host: site.host, kind: 'v', manual: true });
+      useVoteHistoryStore.getState().push({ t: Date.now(), serverId: server.id, host: site.host, siteId: site.id, kind: 'v', manual: true });
       setConfirmed((c) => c + 1);
     }
     setMessage(`${serverConfirmed ? 'Vote confirmé par le site du serveur.' : 'Vote validé par toi.'} Prochain rappel dans ${formatDelay(manualDelay)}.`);
@@ -257,7 +260,9 @@ export function VoteQueue({ server, siteIds, onClose }: VoteQueueProps) {
   const finished = phase === 'done' || phase === 'early' || phase === 'delay';
   const status =
     phase === 'waiting'
-      ? 'En attente de la confirmation du site du serveur…'
+      ? canConfirm
+        ? 'En attente de la confirmation du site du serveur…'
+        : "Vote sur le site qui vient de s'ouvrir, puis clique sur « J'ai voté »."
       : phase === 'done'
         ? (message ?? 'Vote confirmé.')
         : phase === 'early'
@@ -291,14 +296,14 @@ export function VoteQueue({ server, siteIds, onClose }: VoteQueueProps) {
       </div>
 
       <div className="flex items-start gap-2 text-sm text-text">
-        {phase === 'waiting' ? (
+        {phase === 'waiting' && canConfirm ? (
           <RefreshCw size={14} className="mt-0.5 shrink-0 animate-spin text-text-muted" />
         ) : (
           <span
             className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
               phase === 'error'
                 ? 'bg-red-500'
-                : phase === 'delay' || phase === 'select' || phase === 'manual'
+                : phase === 'waiting' || phase === 'delay' || phase === 'select' || phase === 'manual'
                   ? 'bg-amber-500'
                   : 'bg-emerald-500'
             }`}
@@ -369,7 +374,7 @@ export function VoteQueue({ server, siteIds, onClose }: VoteQueueProps) {
         </div>
       )}
 
-      {phase === 'waiting' && (
+      {phase === 'waiting' && canConfirm && (
         <p className="text-xs text-text-muted">
           Certains sites de vote ne confirment jamais auprès du serveur. Si tu as bien voté, valide toi-même :
           Limeris lance le délai et te préviendra au prochain vote.

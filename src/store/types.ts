@@ -20,6 +20,11 @@ export interface VoteSite {
   localUntil?: number | null;
   /** Délai entre deux votes choisi à la main pour ce site, en minutes. */
   manualDelayMin?: number | null;
+  /**
+   * Dernier changement du délai de ce site (ms) : sert à départager deux appareils reliés au même
+   * compte Limeris. `notified` et `lastRemindAt` n'y touchent pas, ils restent propres à l'appareil.
+   */
+  updatedAt?: number;
 }
 
 export interface VoteServer {
@@ -27,6 +32,8 @@ export interface VoteServer {
   name: string;
   baseUrl: string;
   pseudo: string;
+  /** Dernier changement du nom, de l'adresse ou du pseudo (ms), pour la synchronisation. */
+  identityAt?: number;
   sites: VoteSite[];
   /** Votes du mois en cours, comptés par le site du serveur. */
   monthVotes: number | null;
@@ -75,15 +82,22 @@ export interface VoteData {
   servers: VoteServer[];
   currentId: string | null;
   settings: VoteSettings;
+  /** Dernier changement des paramètres (ms), pour la synchronisation. */
+  settingsAt?: number;
+  /** Serveurs retirés sur cet appareil, à annoncer au compte Limeris tant qu'il ne les connaît pas. */
+  removed?: string[];
 }
 
 /** 'v' = vote confirmé par le site du serveur, 'o' = un site est redevenu disponible. */
 export type VoteEventKind = 'v' | 'o';
 
 export interface VoteEvent {
+  /** Créé par l'appareil : un événement envoyé deux fois au compte Limeris n'y est compté qu'une fois. */
+  id?: string;
   t: number;
   serverId: string;
   host: string;
+  siteId?: string;
   kind: VoteEventKind;
   /** Message de récompense renvoyé par le site (votes seulement). */
   reward?: string;
@@ -92,6 +106,33 @@ export interface VoteEvent {
 }
 
 export const MAX_EVENTS = 8000;
+
+/** Empreinte courte et stable d'un texte (FNV-1a, deux passes) : sert d'identifiant d'événement. */
+export function shortHash(text: string): string {
+  let a = 0x811c9dc5;
+  let b = 0x01000193;
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    a = Math.imul(a ^ c, 0x01000193);
+    b = Math.imul(b ^ c, 0x811c9dc5) + (a >>> 7);
+  }
+  return (a >>> 0).toString(16).padStart(8, '0') + (b >>> 0).toString(16).padStart(8, '0');
+}
+
+/**
+ * Identifiant d'un événement « site redevenu disponible ». Calculé à partir de l'échéance, pas tiré
+ * au hasard : deux appareils qui constatent la même disponibilité créent le même identifiant, et
+ * le compte Limeris ne la compte qu'une fois.
+ */
+export function openEventId(serverId: string, siteId: string, deadline: number | null, now: number): string {
+  return `o_${shortHash(`${serverId}|${siteId}|${deadline ?? `h${Math.floor(now / 3_600_000)}`}`)}`;
+}
+
+/** Donne un identifiant aux événements enregistrés avant la synchronisation, toujours le même. */
+export function withEventId(event: VoteEvent): VoteEvent {
+  if (event.id) return event;
+  return { ...event, id: `l_${shortHash(`${event.t}|${event.serverId}|${event.host}|${event.kind}`)}` };
+}
 
 export function isAvailable(site: VoteSite, now: number): boolean {
   return site.nextAt === null || site.nextAt <= now;
@@ -124,10 +165,14 @@ export function applyStatus(
         const remote = sites[site.id] ?? null;
         const local = site.localUntil ?? null;
         const next = local !== null && local > now ? local : remote !== null && remote > now ? remote : null;
+        // La date de changement ne bouge que si le délai change vraiment : une relecture qui
+        // n'apprend rien ne doit pas passer devant le changement d'un autre appareil.
+        const changed = next !== site.nextAt || (next === null && (site.localUntil ?? null) !== null);
+        const updatedAt = changed ? now : site.updatedAt;
         // Un délai en cours remet le signalement à zéro : le moteur préviendra à son échéance.
         return next !== null
-          ? { ...site, nextAt: next, notified: false, lastRemindAt: null }
-          : { ...site, nextAt: null, localUntil: null };
+          ? { ...site, nextAt: next, notified: false, lastRemindAt: null, updatedAt }
+          : { ...site, nextAt: null, localUntil: null, updatedAt };
       }),
     };
   });
@@ -147,6 +192,7 @@ export function validateManually(servers: VoteServer[], serverId: string, siteId
     nextAt: until,
     notified: false,
     lastRemindAt: null,
+    updatedAt: now,
   }));
 }
 
