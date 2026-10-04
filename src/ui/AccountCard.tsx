@@ -4,7 +4,7 @@ import { Card } from './components/Card';
 import { Button } from './components/Button';
 import { openExternal, requestSiteAccess } from '../platform';
 import { useAccountStore } from '../store/store';
-import { CONNECT_URL, describeSyncError, LIMERIS_URL, syncNow, VOTES_URL } from '../sync/limeris';
+import { CONNECT_URL, describeSyncError, LIMERIS_URL, revokeToken, syncNow, VOTES_URL } from '../sync/limeris';
 import { relativeTime } from './format';
 import { useNow } from './useNow';
 
@@ -49,6 +49,8 @@ export function AccountCard() {
     }
     setConfirming(false);
     setError(null);
+    // Le jeton est aussi révoqué côté limeris.fr, pour qu'il ne puisse plus servir.
+    if (account) void revokeToken(account);
     setAccount(null);
   }
 

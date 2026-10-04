@@ -3,8 +3,8 @@ import type { LimerisAccount } from '../sync/limeris';
 
 /**
  * Enregistrement dans le navigateur (chrome.storage.local), partagé entre le panneau, la fenêtre
- * de l'icône et le service worker. Tout le stockage passe par ce fichier : c'est ici que la
- * synchronisation avec un compte limeris.fr viendra se brancher.
+ * de l'icône et le service worker. Tout le stockage passe par ce fichier ; la synchronisation
+ * avec le compte limeris.fr (sync/limeris.ts) lit et écrit par lui.
  */
 
 /** Mêmes noms que dans Limeris. */
@@ -32,6 +32,15 @@ export async function readData(): Promise<VoteData> {
 
 export async function writeData(data: VoteData): Promise<void> {
   await chrome.storage.local.set({ [STATE_KEY]: data });
+}
+
+export async function readHistory(): Promise<VoteEvent[]> {
+  const got = await chrome.storage.local.get(HISTORY_KEY);
+  return got[HISTORY_KEY]?.events ?? [];
+}
+
+export async function writeHistory(events: VoteEvent[]): Promise<void> {
+  await chrome.storage.local.set({ [HISTORY_KEY]: { events: events.slice(-MAX_EVENTS) } });
 }
 
 export async function appendHistory(events: VoteEvent[]): Promise<void> {
