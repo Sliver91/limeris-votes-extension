@@ -23,9 +23,14 @@ Navigateurs : Chrome ou Brave, sur ordinateur.
 --------
 - Ne déplace pas et ne supprime pas le dossier « extension » après
   l'installation : le navigateur le relit à chaque démarrage.
-- Les rappels arrivent tant que le navigateur est ouvert.
-- Pour mettre à jour : remplace le contenu du dossier « extension »,
-  puis clique sur la flèche de rechargement de l'extension dans la page
-  des extensions.
+- Les rappels arrivent tant que le navigateur est ouvert, ou qu'il tourne
+  en arrière-plan après la fermeture des fenêtres (réglage du navigateur :
+  Paramètres > Système > « Poursuivre l'exécution des applications en
+  arrière-plan »). Si tu quittes le navigateur depuis son icône près de
+  l'horloge, les rappels s'arrêtent.
+- Pour mettre à jour : double-clique sur « Mettre à jour.bat » (il
+  télécharge la dernière version depuis GitHub et remplace le contenu du
+  dossier « extension »), puis clique sur la flèche de rechargement de
+  l'extension dans la page des extensions.
 
 Site : https://limeris.fr

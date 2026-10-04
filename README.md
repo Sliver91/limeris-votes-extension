@@ -39,6 +39,10 @@ L'extension s'installe pour l'instant en mode développeur, sur ordinateur.
 
 Ne déplace pas le dossier `extension` après l'installation : le navigateur le relit à chaque démarrage.
 
+## Mise à jour
+
+Double-clique sur `Mettre à jour.bat`, à côté du dossier `extension` : il télécharge la dernière version et remplace le contenu du dossier. Clique ensuite sur la flèche de rechargement de l'extension dans `chrome://extensions`. Tes serveurs et ton compte sont conservés.
+
 ## Vie privée
 
 - Aucun compte, aucun serveur intermédiaire : tes serveurs, tes paramètres et ton historique restent dans ton navigateur.
