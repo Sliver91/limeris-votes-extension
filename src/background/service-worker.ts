@@ -1,5 +1,6 @@
 import { checkUser, type VoteUserStatus } from '../azuriom/client';
-import { appendHistory, readData, reviveData, STATE_KEY, writeData } from '../store/chromeStorage';
+import { appendHistory, readAccount, readData, reviveData, STATE_KEY, writeAccount, writeData } from '../store/chromeStorage';
+import { isLimerisSender, MSG_CONNECT, MSG_PING, parseConnectMessage } from '../sync/limeris';
 import { applyStatus, setServerError, type VoteServer, type VoteSound } from '../store/types';
 import { checkServers, countAvailable, nextDeadline, type Notice } from './engine';
 
@@ -144,6 +145,27 @@ chrome.notifications.onClicked.addListener(async (id) => {
     await writeData({ ...data, currentId: serverId });
   }
   await showPanel();
+});
+
+// Messages de la page limeris.fr (seules ses pages peuvent en envoyer, voir le manifeste ; l'origine
+// est revérifiée ici). `ping` lui dit si l'extension est là, `connect` lui remet le jeton du compte.
+chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
+  if (!isLimerisSender(sender)) return;
+  if (message?.type === MSG_PING) {
+    readAccount().then((account) =>
+      sendResponse({ ok: true, version: chrome.runtime.getManifest().version, connected: account !== null })
+    );
+    return true;
+  }
+  if (message?.type === MSG_CONNECT) {
+    const account = parseConnectMessage(message, Date.now());
+    if (!account) {
+      sendResponse({ ok: false });
+      return;
+    }
+    writeAccount(account).then(() => sendResponse({ ok: true }));
+    return true;
+  }
 });
 
 ensureAlarms();

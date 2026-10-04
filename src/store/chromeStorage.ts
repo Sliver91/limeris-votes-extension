@@ -1,4 +1,5 @@
 import { DEFAULT_SETTINGS, MAX_EVENTS, VOTE_SOUNDS, type VoteData, type VoteEvent } from './types';
+import type { LimerisAccount } from '../sync/limeris';
 
 /**
  * Enregistrement dans le navigateur (chrome.storage.local), partagé entre le panneau, la fenêtre
@@ -36,6 +37,18 @@ export async function appendHistory(events: VoteEvent[]): Promise<void> {
   const got = await chrome.storage.local.get(HISTORY_KEY);
   const previous: VoteEvent[] = got[HISTORY_KEY]?.events ?? [];
   await chrome.storage.local.set({ [HISTORY_KEY]: { events: [...previous, ...events].slice(-MAX_EVENTS) } });
+}
+
+/** Compte limeris.fr connecté à cette extension. Rangé à part : il ne quitte jamais cet appareil. */
+export const ACCOUNT_KEY = 'limeris-votes-account';
+
+export async function readAccount(): Promise<LimerisAccount | null> {
+  const got = await chrome.storage.local.get(ACCOUNT_KEY);
+  return got[ACCOUNT_KEY]?.account ?? null;
+}
+
+export async function writeAccount(account: LimerisAccount | null): Promise<void> {
+  await chrome.storage.local.set({ [ACCOUNT_KEY]: { account } });
 }
 
 interface BindableStore<S> {

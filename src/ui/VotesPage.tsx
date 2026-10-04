@@ -15,6 +15,7 @@ import { VoteQueue } from './VoteQueue';
 import { StatsTab } from './StatsTab';
 import { CopyPseudoButton } from './CopyPseudoButton';
 import { Brand, SITE_URL, SiteLink } from './Brand';
+import { AccountCard } from './AccountCard';
 
 type Tab = 'votes' | 'stats' | 'settings';
 
@@ -284,6 +285,8 @@ function SettingsTab() {
 
   return (
     <div className="grid gap-3 sm:gap-4 md:grid-cols-2">
+      <AccountCard />
+
       <Card className="flex min-w-0 flex-col gap-3">
         <h2 className="text-sm font-semibold text-text">Rappels</h2>
         <Switch checked={settings.notify} onChange={(notify) => update({ notify })} label="Prévenir dès qu'un vote est disponible" />

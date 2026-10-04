@@ -1,13 +1,14 @@
-import { useEffect, useRef } from 'react';
-import { Settings2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ExternalLink, LogIn, RefreshCw, Settings2 } from 'lucide-react';
 import { Brand } from '../ui/Brand';
 import { Card } from '../ui/components/Card';
 import { Button } from '../ui/components/Button';
 import { formatLeft } from '../ui/format';
 import { useNow } from '../ui/useNow';
 import { describeVoteError } from '../azuriom/errors';
-import { openPanel, setPendingQueue, setPendingTab } from '../platform';
-import { isAvailable, useVoteStore } from '../store/store';
+import { openExternal, openPanel, setPendingQueue, setPendingTab } from '../platform';
+import { isAvailable, useAccountStore, useVoteStore } from '../store/store';
+import { describeSyncError, syncNow, VOTES_URL } from '../sync/limeris';
 
 /**
  * Fenêtre de l'icône : le résumé seulement. Elle se ferme dès qu'on clique ailleurs, donc la file
@@ -55,6 +56,7 @@ export function Popup() {
             <Button onClick={showPanel}>Ajouter un serveur</Button>
           </div>
         </Card>
+        <AccountBar onConnect={showSettings} />
       </div>
     );
   }
@@ -142,6 +144,52 @@ export function Popup() {
           );
         })}
       </Card>
+
+      <AccountBar onConnect={showSettings} />
+    </div>
+  );
+}
+
+/** Pied de la fenêtre : accès à limeris.fr/votes, et synchronisation ou connexion au compte. */
+function AccountBar({ onConnect }: { onConnect: () => void }) {
+  const account = useAccountStore((s) => s.account);
+  const setAccount = useAccountStore((s) => s.setAccount);
+  const [syncing, setSyncing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function sync() {
+    if (!account) return;
+    setSyncing(true);
+    setError(null);
+    try {
+      await syncNow(account);
+      setAccount({ ...account, lastSyncAt: Date.now() });
+    } catch (e) {
+      setError(describeSyncError(e));
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex gap-2">
+        <Button variant="secondary" onClick={() => openExternal(VOTES_URL)} className="flex-1 px-3 py-1.5 text-xs">
+          <ExternalLink size={13} /> limeris.fr/votes
+        </Button>
+        {account ? (
+          <Button variant="secondary" onClick={sync} disabled={syncing} className="flex-1 px-3 py-1.5 text-xs">
+            <RefreshCw size={13} className={syncing ? 'animate-spin' : ''} /> Synchroniser
+          </Button>
+        ) : (
+          // La connexion demande une autorisation au navigateur, ce qui fermerait cette fenêtre :
+          // elle se fait depuis les Paramètres, dans le panneau.
+          <Button variant="secondary" onClick={onConnect} className="flex-1 px-3 py-1.5 text-xs">
+            <LogIn size={13} /> Se connecter
+          </Button>
+        )}
+      </div>
+      {error && <p className="text-xs text-red-500">{error}</p>}
     </div>
   );
 }

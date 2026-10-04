@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { bindStore, HISTORY_KEY, reviveData, STATE_KEY } from './chromeStorage';
+import { ACCOUNT_KEY, bindStore, HISTORY_KEY, reviveData, STATE_KEY } from './chromeStorage';
+import type { LimerisAccount } from '../sync/limeris';
 import {
   applyStatus,
   DEFAULT_SETTINGS,
@@ -61,8 +62,25 @@ export const useVoteHistoryStore = create<VoteHistoryState>()((set) => ({
   clear: () => set({ events: [] }),
 }));
 
+interface AccountState {
+  /** Compte limeris.fr connecté, ou null. Écrit par le service worker quand le site remet le jeton. */
+  account: LimerisAccount | null;
+  setAccount: (account: LimerisAccount | null) => void;
+}
+
+export const useAccountStore = create<AccountState>()((set) => ({
+  account: null,
+  setAccount: (account) => set({ account }),
+}));
+
 /** Tenue une fois les données enregistrées chargées : les écrans attendent ça pour s'afficher. */
 export const storeReady: Promise<unknown> = Promise.all([
+  bindStore<AccountState, { account: LimerisAccount | null }>(
+    useAccountStore,
+    ACCOUNT_KEY,
+    ({ account }) => ({ account }),
+    (saved) => ({ account: saved?.account ?? null })
+  ),
   bindStore<VoteStoreState, VoteData>(
     useVoteStore,
     STATE_KEY,

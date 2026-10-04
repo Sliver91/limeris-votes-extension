@@ -1,7 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Limeris votes",
-  "version": "0.1.1",
+  "version": "0.2.0",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAszUmvKGqA9HemGDLronT5S2+A9xM38OFQ+JAWj9A3Vqw7lVIgJUw9XdOrfk4a0QBbiTcIGkCDjlyvtOD5pBvrO3kVI66k+HGvMeESjBiD0xg9fw02yfqu/lgNRzk0n5OltcfuhqDCR5hqCEvUFITgmawAxjdWVdZXQo7GCvlegjfEnKh/Mh3jfzz7XN4p/C/fgc+RFWZFOHXE+2n8hx/SclP6w0dWSUWTdMVY+D/6yyvlt/fy7qwSB983VoQSfiEet1/jA0bxsGw7Nn1C1DgLCH4+7NtCcP57VYIlLl2Yk4OgBrREFEXrGNo8y8OhvmYSaCFEVPaEsu27PfZJHt0aQIDAQAB",
   "description": "Rappels et file de vote pour les serveurs Minecraft : sois prévenu dès qu'un site de vote redevient disponible. Développée par Sliver91.",
   "homepage_url": "https://limeris.fr",
   "minimum_chrome_version": "116",
@@ -26,6 +27,22 @@
     "service_worker": "service-worker.js",
     "type": "module"
   },
-  "permissions": ["storage", "alarms", "notifications", "sidePanel", "offscreen", "clipboardWrite"],
-  "optional_host_permissions": ["https://*/*", "http://*/*"]
+  "externally_connectable": {
+    "matches": [
+      "https://limeris.fr/*",
+      "https://www.limeris.fr/*"
+    ]
+  },
+  "permissions": [
+    "storage",
+    "alarms",
+    "notifications",
+    "sidePanel",
+    "offscreen",
+    "clipboardWrite"
+  ],
+  "optional_host_permissions": [
+    "https://*/*",
+    "http://*/*"
+  ]
 }
