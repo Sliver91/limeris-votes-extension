@@ -1,6 +1,6 @@
 import { checkUser, type VoteUserStatus } from '../azuriom/client';
 import { appendHistory, readAccount, readData, reviveData, STATE_KEY, writeAccount, writeData } from '../store/chromeStorage';
-import { isLimerisSender, MSG_CONNECT, MSG_PING, parseConnectMessage } from '../sync/limeris';
+import { isLimerisSender, MSG_CONNECT, MSG_PING, parseConnectMessage, syncNow } from '../sync/limeris';
 import { applyStatus, setServerError, type VoteServer, type VoteSound } from '../store/types';
 import { checkServers, countAvailable, nextDeadline, type Notice } from './engine';
 
@@ -11,7 +11,10 @@ import { checkServers, countAvailable, nextDeadline, type Notice } from './engin
 
 /** Contrôle régulier, pour les relances et la fin de la plage de silence. */
 const TICK_ALARM = 'tick';
-/** Resynchronisation avec le site du serveur : rattrape les votes faits ailleurs que dans l'extension. */
+/**
+ * Resynchronisation avec le site du serveur : rattrape les votes faits ailleurs que dans l'extension.
+ * Suivie d'un échange avec le compte limeris.fr, s'il est connecté.
+ */
 const REFRESH_ALARM = 'refresh';
 /** Réveil à l'heure exacte où le prochain site redevient disponible. */
 const NEXT_ALARM = 'next';
@@ -97,6 +100,23 @@ async function refreshAll() {
   await check();
 }
 
+/**
+ * Échange avec le compte limeris.fr quand l'extension y est connectée. Un échec (pas de réseau,
+ * jeton révoqué) ne bloque rien : l'essai suivant, ou le bouton « Synchroniser », le dira.
+ */
+async function syncAccount() {
+  const account = await readAccount();
+  if (!account) return;
+  try {
+    await syncNow(account);
+    // Relecture : l'utilisateur a pu se déconnecter ou se reconnecter pendant l'échange.
+    const current = await readAccount();
+    if (current?.connectedAt === account.connectedAt) await writeAccount({ ...current, lastSyncAt: Date.now() });
+  } catch (e) {
+    console.warn('[limeris-votes] synchronisation impossible :', e);
+  }
+}
+
 /** Affiche l'outil : l'écran déjà ouvert s'il y en a un, sinon un nouvel onglet. */
 async function showPanel() {
   const url = chrome.runtime.getURL('panel.html');
@@ -115,18 +135,18 @@ async function showPanel() {
 }
 
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === REFRESH_ALARM) refreshAll();
+  if (alarm.name === REFRESH_ALARM) refreshAll().then(syncAccount);
   else check();
 });
 
 chrome.runtime.onInstalled.addListener(() => {
   ensureAlarms();
-  refreshAll();
+  refreshAll().then(syncAccount);
 });
 
 chrome.runtime.onStartup.addListener(() => {
   ensureAlarms();
-  refreshAll();
+  refreshAll().then(syncAccount);
 });
 
 // Un écran vient de modifier les données (vote confirmé, serveur ajouté…) : l'icône et le
@@ -163,7 +183,11 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
       sendResponse({ ok: false });
       return;
     }
-    writeAccount(account).then(() => sendResponse({ ok: true }));
+    writeAccount(account).then(() => {
+      sendResponse({ ok: true });
+      // Premier échange tout de suite : les serveurs de l'appareil arrivent sur limeris.fr/votes.
+      syncAccount();
+    });
     return true;
   }
 });
