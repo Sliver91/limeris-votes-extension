@@ -31,17 +31,29 @@ Elle ne vote pas à ta place : tu valides le captcha sur chaque site, et le site
 
 L'extension s'installe pour l'instant en mode développeur, sur ordinateur.
 
-1. Télécharge le fichier zip de la dernière version dans l'onglet **Releases**, puis décompresse-le.
-2. Ouvre `chrome://extensions` (ou `brave://extensions`).
-3. Active le **Mode développeur**, en haut à droite.
-4. Clique sur **Charger l'extension non empaquetée** et choisis le dossier `extension`.
-5. Clique sur l'icône Limeris, puis **Ajouter un serveur** : l'adresse du site du serveur et ton pseudo.
+1. Crée un nouveau dossier à la racine de ton disque dur, par exemple `C:\Limeris votes`. Ce dossier restera en place : c'est lui que le navigateur relit à chaque démarrage, et c'est dedans que se feront toutes les mises à jour.
+2. Télécharge le fichier zip de la dernière version dans l'onglet **[Releases](https://github.com/Sliver91/limeris-votes-extension/releases/latest)**.
+3. Décompresse le zip dans ce dossier. Tu dois y trouver le dossier `extension`, `Mettre à jour.bat`, `mise-a-jour.ps1` et `LISEZ-MOI.txt`.
+4. Ouvre `chrome://extensions` (ou `brave://extensions`).
+5. Active le **Mode développeur**, en haut à droite.
+6. Clique sur **Charger l'extension non empaquetée** et choisis le dossier `extension` (par exemple `C:\Limeris votes\extension`).
+7. Épingle l'extension : icône en forme de pièce de puzzle dans la barre du navigateur, puis l'épingle à côté de « Limeris votes ».
+8. Clique sur l'icône Limeris, puis **Ajouter un serveur** : l'adresse du site du serveur et ton pseudo. Le navigateur demande d'autoriser l'accès à ce site : accepte.
 
-Ne déplace pas le dossier `extension` après l'installation : le navigateur le relit à chaque démarrage.
+> **Important** — ne déplace pas, ne renomme pas et ne supprime pas ce dossier après l'installation, et ne l'installe pas depuis le dossier Téléchargements ou le Bureau : si le dossier bouge, l'extension disparaît du navigateur.
 
 ## Mise à jour
 
-Double-clique sur `Mettre à jour.bat`, à côté du dossier `extension` : il télécharge la dernière version et remplace le contenu du dossier. Clique ensuite sur la flèche de rechargement de l'extension dans `chrome://extensions`. Tes serveurs et ton compte sont conservés.
+À chaque nouvelle version, c'est toujours le même dossier qui est mis à jour : pas besoin de réinstaller l'extension.
+
+1. Double-clique sur `Mettre à jour.bat`, dans ton dossier (par exemple `C:\Limeris votes`) : il télécharge la dernière version et remplace le contenu du dossier `extension`.
+2. Ouvre `chrome://extensions` (ou `brave://extensions`) et clique sur la flèche de rechargement de « Limeris votes ».
+
+Tu peux aussi le faire à la main : télécharge le nouveau zip dans les **Releases** et décompresse-le dans le même dossier en remplaçant les fichiers, puis recharge l'extension.
+
+Tes serveurs, tes paramètres et ton historique sont conservés.
+
+**Plus tard**, l'extension sera publiée sur le Chrome Web Store : l'installation se fera en un clic et les mises à jour seront automatiques, sans dossier ni mode développeur.
 
 ## Vie privée
 

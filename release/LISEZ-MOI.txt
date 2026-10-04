@@ -1,36 +1,66 @@
-﻿Limeris votes — installation en mode développeur
+Limeris votes — installation en mode développeur
 ================================================
 
 Navigateurs : Chrome ou Brave, sur ordinateur.
 
-1. Ouvre la page des extensions :
+1. Crée un nouveau dossier à la racine de ton disque dur,
+   par exemple C:\Limeris votes
+   Ce dossier restera en place : c'est lui que le navigateur relit à
+   chaque démarrage, et c'est dedans que se feront toutes les mises à jour.
+
+2. Décompresse le zip dans ce dossier. Tu dois y trouver le dossier
+   « extension », « Mettre à jour.bat », « mise-a-jour.ps1 » et ce fichier.
+
+3. Ouvre la page des extensions :
      Chrome : chrome://extensions
      Brave  : brave://extensions
 
-2. Active « Mode développeur » (interrupteur en haut à droite).
+4. Active « Mode développeur » (interrupteur en haut à droite).
 
-3. Clique sur « Charger l'extension non empaquetée »
-   et choisis le dossier « extension » qui se trouve à côté de ce fichier.
+5. Clique sur « Charger l'extension non empaquetée »
+   et choisis le dossier « extension » qui se trouve à côté de ce fichier
+   (par exemple C:\Limeris votes\extension).
 
-4. Épingle l'extension : icône en forme de pièce de puzzle dans la barre
+6. Épingle l'extension : icône en forme de pièce de puzzle dans la barre
    du navigateur, puis l'épingle à côté de « Limeris votes ».
 
-5. Clique sur l'icône Limeris, puis « Ajouter un serveur » :
+7. Clique sur l'icône Limeris, puis « Ajouter un serveur » :
    l'adresse du site du serveur (par exemple atheramc.fr) et ton pseudo.
    Le navigateur demande d'autoriser l'accès à ce site : accepte.
 
+Important
+---------
+Ne déplace pas, ne renomme pas et ne supprime pas ce dossier après
+l'installation, et ne l'installe pas depuis le dossier Téléchargements
+ou le Bureau : si le dossier bouge, l'extension disparaît du navigateur.
+
+Mise à jour
+-----------
+À chaque nouvelle version, c'est toujours le même dossier qui est mis à
+jour : pas besoin de réinstaller l'extension.
+
+1. Double-clique sur « Mettre à jour.bat » : il télécharge la dernière
+   version depuis GitHub et remplace le contenu du dossier « extension ».
+
+2. Ouvre la page des extensions et clique sur la flèche de rechargement
+   de « Limeris votes ».
+
+Tu peux aussi le faire à la main : télécharge le nouveau zip sur GitHub
+et décompresse-le dans le même dossier en remplaçant les fichiers, puis
+recharge l'extension.
+
+Tes serveurs, tes paramètres et ton historique sont conservés.
+
+Plus tard, l'extension sera publiée sur le Chrome Web Store :
+l'installation se fera en un clic et les mises à jour seront
+automatiques, sans dossier ni mode développeur.
+
 À savoir
 --------
-- Ne déplace pas et ne supprime pas le dossier « extension » après
-  l'installation : le navigateur le relit à chaque démarrage.
-- Les rappels arrivent tant que le navigateur est ouvert, ou qu'il tourne
-  en arrière-plan après la fermeture des fenêtres (réglage du navigateur :
-  Paramètres > Système > « Poursuivre l'exécution des applications en
-  arrière-plan »). Si tu quittes le navigateur depuis son icône près de
-  l'horloge, les rappels s'arrêtent.
-- Pour mettre à jour : double-clique sur « Mettre à jour.bat » (il
-  télécharge la dernière version depuis GitHub et remplace le contenu du
-  dossier « extension »), puis clique sur la flèche de rechargement de
-  l'extension dans la page des extensions.
+Les rappels arrivent tant que le navigateur est ouvert, ou qu'il tourne
+en arrière-plan après la fermeture des fenêtres (réglage du navigateur :
+Paramètres > Système > « Poursuivre l'exécution des applications en
+arrière-plan »). Si tu quittes le navigateur depuis son icône près de
+l'horloge, les rappels s'arrêtent.
 
 Site : https://limeris.fr
