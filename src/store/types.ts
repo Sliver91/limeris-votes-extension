@@ -62,6 +62,8 @@ export interface VoteSettings {
   volume: number;
   openMode: OpenMode;
   chain: boolean;
+  /** Affiche l'heure du prochain vote en plus du compte à rebours. Propre à l'appareil : pas synchronisé. */
+  showTime?: boolean;
 }
 
 export const DEFAULT_SETTINGS: VoteSettings = {
@@ -75,6 +77,7 @@ export const DEFAULT_SETTINGS: VoteSettings = {
   volume: 0.6,
   openMode: 'tab',
   chain: true,
+  showTime: false,
 };
 
 /** Ce qui est enregistré dans le navigateur sous STATE_KEY. */
