@@ -81,6 +81,32 @@ function missed(c: Counts): number {
   return Math.max(0, c.chances - c.votes);
 }
 
+function median(values: number[]): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = sorted.length >> 1;
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+/** Jours complets du mois qu'il faut avant d'oser un pronostic. */
+const FORECAST_MIN_DAYS = 3;
+
+/**
+ * Pronostic du total de votes à la fin du mois, si l'on reste aussi régulier : ce qui est déjà
+ * voté, plus la médiane des jours complets du mois pour chaque jour restant. La médiane, pas la
+ * moyenne : un jour exceptionnel (rien voté, ou tout rattrapé) ne fausse pas l'estimation.
+ * `dayVotes` : votes de chaque jour du mois jusqu'à aujourd'hui compris (incomplet, hors médiane).
+ */
+function monthForecast(dayVotes: number[], total: number, now: number): { total: number; perDay: number; days: number } | null {
+  const past = dayVotes.slice(0, -1);
+  if (past.length < FORECAST_MIN_DAYS) return null;
+  const perDay = median(past);
+  const date = new Date(now);
+  const daysLeft = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate() - date.getDate();
+  const today = dayVotes[dayVotes.length - 1] ?? 0;
+  return { total: Math.round(total + Math.max(0, perDay - today) + perDay * daysLeft), perDay, days: past.length };
+}
+
 function niceMax(n: number): number {
   return [4, 6, 8, 10, 20, 30, 40, 50, 60, 80, 100, 200, 400, 600, 1000].find((x) => x >= n) ?? Math.ceil(n / 1000) * 1000;
 }
@@ -199,6 +225,7 @@ export function StatsTab() {
   const sites = [...stats.sites.entries()].sort((a, b) => b[1].votes - a[1].votes);
   const topVotes = Math.max(1, ...sites.map(([, c]) => c.votes));
   const rate = successRate(stats);
+  const forecast = period === 'cur' ? monthForecast(days.map(([, c]) => c.votes), stats.votes, now) : null;
   const periodName = period === '30' ? 'sur 30 jours' : `en ${monthName(period === 'cur' ? now : prevMonthStart)}`;
 
   return (
@@ -262,6 +289,22 @@ export function StatsTab() {
               <div className="h-2 rounded-full bg-accent" style={{ width: `${rate}%` }} />
             </div>
           </div>
+          {period === 'cur' && (
+            <div className="rounded-lg bg-accent-soft px-3 py-2.5">
+              <p className="text-xs font-semibold text-text">Pronostic à la fin du mois</p>
+              {forecast ? (
+                <>
+                  <p className="font-mono text-2xl font-medium tabular-nums text-text">≈ {forecast.total} votes</p>
+                  <p className="text-xs text-text-muted">
+                    Si tu restes aussi régulier : médiane de {forecast.perDay.toLocaleString('fr-FR')} vote{forecast.perDay > 1 ? 's' : ''} par
+                    jour sur les {forecast.days} jours écoulés.
+                  </p>
+                </>
+              ) : (
+                <p className="text-xs text-text-muted">Disponible après {FORECAST_MIN_DAYS} jours complets dans le mois.</p>
+              )}
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3 border-t border-border pt-3">
             <div>
               <p className="font-mono text-xl font-medium tabular-nums text-text">{missed(stats)}</p>

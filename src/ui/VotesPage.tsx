@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { BarChart3, BellRing, Plus, RefreshCw, Settings2, Vote, X } from 'lucide-react';
+import { BarChart3, BellRing, Pencil, Plus, RefreshCw, Settings2, Vote, X } from 'lucide-react';
 import { Card } from './components/Card';
 import { Button } from './components/Button';
 import { Switch } from './components/Switch';
@@ -8,9 +8,9 @@ import { ERR } from '../azuriom/errors';
 import { playSound, SOUNDS } from '../lib/sound';
 import { appVersion, assetUrl, scheduleTestNotification, onPendingQueue, onPendingTab, openExtension, openExternal, requestSiteAccess, takePendingQueue, takePendingTab, useHost } from '../platform';
 import { AccountSection } from '../account/AccountSection';
-import { formatLeft, relativeTime } from './format';
+import { formatClock, formatLeft, relativeTime } from './format';
 import { describeVoteError, importServer, refreshServer } from './api';
-import { isAvailable, useVoteStore, type OpenMode, type VoteServer, type VoteSound } from '../store/store';
+import { isAvailable, useVoteStore, type OpenMode, type VoteServer, type VoteSite, type VoteSound } from '../store/store';
 import { useNow } from './useNow';
 import { VoteQueue } from './VoteQueue';
 import { StatsTab } from './StatsTab';
@@ -158,10 +158,127 @@ function RemoveServerButton({ server }: { server: VoteServer }) {
   );
 }
 
+const timeInputClass = 'w-12 rounded-lg border border-border bg-surface px-1.5 py-1 text-base tabular-nums text-text';
+
+/**
+ * Une tuile par site de vote. Le crayon ouvre le réglage du délai : le compte à rebours peut se
+ * tromper (vote fait ailleurs, délai mal lu), l'utilisateur le corrige lui-même.
+ */
+function SiteTile({ serverId, site, now, showTime, onVote }: { serverId: string; site: VoteSite; now: number; showTime: boolean; onVote: () => void }) {
+  const patchSite = useVoteStore((s) => s.patchSite);
+  const [editing, setEditing] = useState(false);
+  const [hours, setHours] = useState('0');
+  const [minutes, setMinutes] = useState('0');
+  const available = isAvailable(site, now);
+
+  function openEdit() {
+    // Site en attente : le temps restant. Site disponible : le dernier délai choisi pour lui.
+    const left = available ? (site.manualDelayMin ?? 0) : Math.ceil(((site.nextAt ?? now) - now) / 60_000);
+    setHours(String(Math.floor(left / 60)));
+    setMinutes(String(left % 60));
+    setEditing(true);
+  }
+
+  function save(e: FormEvent) {
+    e.preventDefault();
+    const total = Math.max(0, Math.floor(Number(hours) || 0)) * 60 + Math.max(0, Math.floor(Number(minutes) || 0));
+    const at = Date.now();
+    const until = at + total * 60_000;
+    // Comme un délai lancé à la main : il fait foi tant qu'il court (voir applyStatus).
+    patchSite(
+      serverId,
+      site.id,
+      total > 0
+        ? { nextAt: until, localUntil: until, notified: false, lastRemindAt: null, updatedAt: at }
+        : { nextAt: null, localUntil: null, updatedAt: at }
+    );
+    setEditing(false);
+  }
+
+  if (editing) {
+    return (
+      <form onSubmit={save} className="flex min-w-0 flex-col gap-2 rounded-xl border border-accent bg-surface p-3 shadow-sm">
+        <p className="text-xs font-semibold text-text">Prochain vote dans</p>
+        <p className="truncate text-xs text-text-muted">{site.host}</p>
+        <div className="flex flex-wrap items-center gap-1 text-xs text-text-muted">
+          <input type="number" inputMode="numeric" min={0} max={72} aria-label="Heures" value={hours} onChange={(e) => setHours(e.target.value)} className={timeInputClass} />
+          h
+          <input type="number" inputMode="numeric" min={0} max={59} aria-label="Minutes" value={minutes} onChange={(e) => setMinutes(e.target.value)} className={timeInputClass} />
+          min
+        </div>
+        <p className="text-[11px] leading-tight text-text-muted">0 : disponible maintenant.</p>
+        <div className="mt-auto flex gap-1.5">
+          <button type="submit" className="min-h-9 flex-1 rounded-lg bg-accent text-xs font-semibold text-[var(--accent-contrast)]">
+            OK
+          </button>
+          <button type="button" onClick={() => setEditing(false)} className="min-h-9 flex-1 rounded-lg border border-border text-xs text-text-muted hover:text-text">
+            Annuler
+          </button>
+        </div>
+      </form>
+    );
+  }
+
+  return (
+    <div className={`flex min-w-0 flex-col gap-2 rounded-xl border bg-surface p-3 shadow-sm ${available ? 'border-accent' : 'border-border'}`}>
+      <div className="flex items-center justify-between gap-1">
+        {available ? (
+          <p className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+            <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" /> Disponible
+          </p>
+        ) : (
+          <p className="text-xs text-text-muted">Revient dans</p>
+        )}
+        <button
+          type="button"
+          onClick={openEdit}
+          aria-label={`Modifier le délai de ${site.host}`}
+          title="Modifier le délai"
+          className="-m-1.5 rounded-md p-1.5 text-text-muted hover:text-text"
+        >
+          <Pencil size={14} />
+        </button>
+      </div>
+      <p
+        className={`min-h-[2.5em] text-[13px] font-medium leading-tight [overflow-wrap:anywhere] sm:text-sm ${available ? 'text-text' : 'text-text-muted'}`}
+        title={site.label && site.label !== site.host ? `${site.host} · ${site.label}` : site.host}
+      >
+        {site.host}
+      </p>
+      {available ? (
+        <button
+          type="button"
+          onClick={onVote}
+          className="mt-auto min-h-11 rounded-lg bg-accent-soft text-sm font-semibold text-text transition-colors hover:bg-accent hover:text-[var(--accent-contrast)]"
+        >
+          Voter
+        </button>
+      ) : (
+        <>
+          <div>
+            <p className="font-mono text-xl font-medium tabular-nums text-text">{formatLeft((site.nextAt ?? now) - now)}</p>
+            {showTime && site.nextAt !== null && <p className="text-xs text-text-muted">{formatClock(site.nextAt, now)}</p>}
+          </div>
+          {/* Toujours cliquable, même pendant le délai : le compte à rebours peut se tromper. */}
+          <button
+            type="button"
+            title="Ouvrir ce site quand même"
+            onClick={onVote}
+            className="mt-auto self-start py-1 text-xs text-text-muted underline-offset-2 hover:text-text hover:underline"
+          >
+            Voter quand même
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 function VotesTab() {
   const servers = useVoteStore((s) => s.servers);
   const currentId = useVoteStore((s) => s.currentId);
   const setCurrent = useVoteStore((s) => s.setCurrent);
+  const showTime = useVoteStore((s) => s.settings.showTime ?? false);
   const now = useNow();
   const host = useHost();
   const [adding, setAdding] = useState(false);
@@ -245,7 +362,9 @@ function VotesTab() {
                   : 'Tout est voté'}
               </p>
               <p className="mt-0.5 text-xs text-text-muted">
-                {nextSite?.nextAt ? `Prochain dans ${formatLeft(nextSite.nextAt - now)} · ${nextSite.host}` : 'Tous les sites sont disponibles.'}
+                {nextSite?.nextAt
+                  ? `Prochain dans ${formatLeft(nextSite.nextAt - now)}${showTime ? ` (${formatClock(nextSite.nextAt, now)})` : ''} · ${nextSite.host}`
+                  : 'Tous les sites sont disponibles.'}
               </p>
             </div>
             {/* Écran large : le bouton est ici. Écran étroit : il reste collé en bas (voir plus bas). */}
@@ -260,51 +379,9 @@ function VotesTab() {
 
           {/* Une tuile par site de vote : deux colonnes dans le panneau latéral et sur téléphone. */}
           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-            {sorted.map((site) => {
-              const available = isAvailable(site, now);
-              return (
-                <div
-                  key={site.id}
-                  className={`flex min-w-0 flex-col gap-2 rounded-xl border bg-surface p-3 shadow-sm ${available ? 'border-accent' : 'border-border'}`}
-                >
-                  {available ? (
-                    <p className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                      <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" /> Disponible
-                    </p>
-                  ) : (
-                    <p className="text-xs text-text-muted">Revient dans</p>
-                  )}
-                  <p
-                    className={`min-h-[2.5em] text-[13px] font-medium leading-tight [overflow-wrap:anywhere] sm:text-sm ${available ? 'text-text' : 'text-text-muted'}`}
-                    title={site.label && site.label !== site.host ? `${site.host} · ${site.label}` : site.host}
-                  >
-                    {site.host}
-                  </p>
-                  {available ? (
-                    <button
-                      type="button"
-                      onClick={() => setQueue([site.id])}
-                      className="mt-auto min-h-11 rounded-lg bg-accent-soft text-sm font-semibold text-text transition-colors hover:bg-accent hover:text-[var(--accent-contrast)]"
-                    >
-                      Voter
-                    </button>
-                  ) : (
-                    <>
-                      <p className="font-mono text-xl font-medium tabular-nums text-text">{formatLeft((site.nextAt ?? now) - now)}</p>
-                      {/* Toujours cliquable, même pendant le délai : le compte à rebours peut se tromper. */}
-                      <button
-                        type="button"
-                        title="Ouvrir ce site quand même"
-                        onClick={() => setQueue([site.id])}
-                        className="mt-auto self-start py-1 text-xs text-text-muted underline-offset-2 hover:text-text hover:underline"
-                      >
-                        Voter quand même
-                      </button>
-                    </>
-                  )}
-                </div>
-              );
-            })}
+            {sorted.map((site) => (
+              <SiteTile key={site.id} serverId={server.id} site={site} now={now} showTime={showTime} onVote={() => setQueue([site.id])} />
+            ))}
             <button
               type="button"
               onClick={() => setAdding(true)}
@@ -524,6 +601,18 @@ function SettingsTab() {
             <p className="px-1 text-xs text-text-muted">
               Limeris ne vote pas à ta place : tu valides le captcha sur chaque site, et le site du serveur confirme
               ensuite le vote et donne la récompense.
+            </p>
+          </section>
+
+          <section className="flex min-w-0 flex-col gap-2">
+            <h2 className={groupTitleClass}>Affichage</h2>
+            <Card className="flex min-w-0 flex-col divide-y divide-border py-1">
+              <div className={rowClass}>
+                <Switch reverse checked={settings.showTime ?? false} onChange={(showTime) => update({ showTime })} label="Afficher l'heure de chaque vote" />
+              </div>
+            </Card>
+            <p className="px-1 text-xs text-text-muted">
+              En plus du compte à rebours, par exemple « à 15 h 12 ». Ce réglage reste sur cet appareil.
             </p>
           </section>
         </div>

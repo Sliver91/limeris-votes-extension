@@ -67,6 +67,8 @@ export interface VoteSettings {
    * rappel : il l'affiche même pendant une vidéo ou un jeu en plein écran. Propre à l'appareil.
    */
   stayOnScreen: boolean;
+  /** Affiche l'heure du prochain vote en plus du compte à rebours. Propre à l'appareil : pas synchronisé. */
+  showTime?: boolean;
 }
 
 export const DEFAULT_SETTINGS: VoteSettings = {
@@ -81,6 +83,7 @@ export const DEFAULT_SETTINGS: VoteSettings = {
   openMode: 'tab',
   chain: true,
   stayOnScreen: true,
+  showTime: false,
 };
 
 /** Ce qui est enregistré dans le navigateur sous STATE_KEY. */
