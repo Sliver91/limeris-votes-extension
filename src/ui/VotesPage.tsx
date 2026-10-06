@@ -34,6 +34,10 @@ const pillClass = (active: boolean) =>
   }`;
 
 const selectClass = 'rounded-lg border border-border bg-surface px-2 py-1 text-sm text-text disabled:opacity-50';
+/** Titre d'un groupe de réglages, au-dessus de sa carte. */
+const groupTitleClass = 'px-1 text-xs font-semibold uppercase tracking-wider text-text-muted';
+/** Une ligne de réglage : libellé à gauche, commande à droite, qui passe dessous si la place manque. */
+const rowClass = 'flex min-h-14 flex-wrap items-center justify-between gap-x-3 gap-y-2 py-2.5';
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
 
 const inputClass = 'w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text';
@@ -202,31 +206,31 @@ function VotesTab() {
   const ready = sorted.filter((s) => isAvailable(s, now));
   const nextSite = sorted.find((s) => !isAvailable(s, now));
 
+  const voteLabel = ready.length > 1 ? `Voter les ${ready.length} à la suite` : 'Voter maintenant';
+  const startAll = () => setQueue(ready.map((s) => s.id));
+
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-2">
+      {/* Sélecteur segmenté : passe à la ligne quand il y a beaucoup de serveurs. */}
+      <div className="flex flex-wrap gap-1 rounded-xl bg-surface-alt p-1">
         {servers.map((s) => {
           const count = s.sites.filter((site) => isAvailable(site, now)).length;
+          const active = s.id === server.id;
           return (
             <button
               key={s.id}
               type="button"
               disabled={queue !== null}
+              aria-pressed={active}
               onClick={() => setCurrent(s.id)}
-              className={`${pillClass(s.id === server.id)} disabled:opacity-50`}
+              className={`min-h-10 flex-1 basis-24 rounded-lg px-3 text-xs font-medium transition-colors disabled:opacity-50 ${
+                active ? 'bg-surface text-text shadow-sm' : 'text-text-muted hover:text-text'
+              }`}
             >
-              {s.name} <span className="font-mono text-text-muted">· {count}</span>
+              {s.name} <span className={`font-mono ${active ? 'text-accent' : ''}`}>{count}</span>
             </button>
           );
         })}
-        <button
-          type="button"
-          disabled={queue !== null}
-          onClick={() => setAdding(true)}
-          className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-accent disabled:opacity-50"
-        >
-          <Plus size={14} /> Ajouter un serveur
-        </button>
       </div>
 
       {queue ? (
@@ -244,45 +248,71 @@ function VotesTab() {
                 {nextSite?.nextAt ? `Prochain dans ${formatLeft(nextSite.nextAt - now)} · ${nextSite.host}` : 'Tous les sites sont disponibles.'}
               </p>
             </div>
-            <Button disabled={ready.length === 0} onClick={() => setQueue(ready.map((s) => s.id))} className="grow sm:grow-0">
-              {ready.length > 1 ? `Voter les ${ready.length} à la suite` : 'Voter maintenant'}
-            </Button>
+            {/* Écran large : le bouton est ici. Écran étroit : il reste collé en bas (voir plus bas). */}
+            <div className="hidden sm:block">
+              <Button disabled={ready.length === 0} onClick={startAll}>
+                {voteLabel}
+              </Button>
+            </div>
           </Card>
 
           {server.error && <p className="text-xs text-red-500">{describeVoteError(server.error)}</p>}
 
-          {/* Le panneau latéral est étroit : le nom du site et son état sont empilés à gauche,
-              seul le bouton reste à droite, pour que le nom garde sa place. */}
-          <Card className="flex flex-col divide-y divide-border py-1">
+          {/* Une tuile par site de vote : deux colonnes dans le panneau latéral et sur téléphone. */}
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
             {sorted.map((site) => {
               const available = isAvailable(site, now);
               return (
-                <div key={site.id} className="flex items-center gap-2 py-2 sm:gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[13px] font-medium leading-snug text-text [overflow-wrap:anywhere] sm:text-sm" title={site.label && site.label !== site.host ? `${site.host} · ${site.label}` : site.host}>
-                      {site.host}
+                <div
+                  key={site.id}
+                  className={`flex min-w-0 flex-col gap-2 rounded-xl border bg-surface p-3 shadow-sm ${available ? 'border-accent' : 'border-border'}`}
+                >
+                  {available ? (
+                    <p className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                      <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" /> Disponible
                     </p>
-                    {available ? (
-                      <p className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" /> Disponible
-                      </p>
-                    ) : (
-                      <p className="font-mono text-xs tabular-nums text-text-muted">dans {formatLeft((site.nextAt ?? now) - now)}</p>
-                    )}
-                  </div>
-                  {/* Toujours cliquable, même pendant le délai : le compte à rebours peut se tromper. */}
-                  <Button
-                    variant="secondary"
-                    title={available ? undefined : 'Ouvrir ce site quand même'}
-                    onClick={() => setQueue([site.id])}
-                    className="shrink-0 px-2.5 py-1.5 text-xs sm:px-3"
+                  ) : (
+                    <p className="text-xs text-text-muted">Revient dans</p>
+                  )}
+                  <p
+                    className={`min-h-[2.5em] text-[13px] font-medium leading-tight [overflow-wrap:anywhere] sm:text-sm ${available ? 'text-text' : 'text-text-muted'}`}
+                    title={site.label && site.label !== site.host ? `${site.host} · ${site.label}` : site.host}
                   >
-                    Voter
-                  </Button>
+                    {site.host}
+                  </p>
+                  {available ? (
+                    <button
+                      type="button"
+                      onClick={() => setQueue([site.id])}
+                      className="mt-auto min-h-11 rounded-lg bg-accent-soft text-sm font-semibold text-text transition-colors hover:bg-accent hover:text-[var(--accent-contrast)]"
+                    >
+                      Voter
+                    </button>
+                  ) : (
+                    <>
+                      <p className="font-mono text-xl font-medium tabular-nums text-text">{formatLeft((site.nextAt ?? now) - now)}</p>
+                      {/* Toujours cliquable, même pendant le délai : le compte à rebours peut se tromper. */}
+                      <button
+                        type="button"
+                        title="Ouvrir ce site quand même"
+                        onClick={() => setQueue([site.id])}
+                        className="mt-auto self-start py-1 text-xs text-text-muted underline-offset-2 hover:text-text hover:underline"
+                      >
+                        Voter quand même
+                      </button>
+                    </>
+                  )}
                 </div>
               );
             })}
-          </Card>
+            <button
+              type="button"
+              onClick={() => setAdding(true)}
+              className="flex min-h-28 items-center justify-center gap-1 rounded-xl border border-dashed border-text-muted p-3 text-sm font-semibold text-accent"
+            >
+              <Plus size={16} /> Ajouter un serveur
+            </button>
+          </div>
 
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-text-muted">
             <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
@@ -300,6 +330,15 @@ function VotesTab() {
               <RemoveServerButton server={server} />
             </span>
           </div>
+
+          {/* Écran étroit : le bouton principal reste sous le pouce, collé en bas. */}
+          {ready.length > 0 && (
+            <div className="sticky bottom-0 z-10 -mx-3 border-t border-border bg-surface px-3 py-3 sm:hidden">
+              <Button onClick={startAll} className="w-full py-3 text-base">
+                {voteLabel}
+              </Button>
+            </div>
+          )}
         </>
       )}
     </div>
@@ -340,142 +379,157 @@ function SettingsTab() {
   ];
 
   return (
-    <div className="grid gap-3 sm:gap-4 md:grid-cols-2">
-      <AccountSection />
+    <div className="flex flex-col gap-6">
+      <div className="grid gap-6 md:grid-cols-2 md:items-start">
+        <div className="flex min-w-0 flex-col gap-3">
+          <AccountSection />
+        </div>
 
-      <Card className="flex min-w-0 flex-col gap-3">
-        <h2 className="text-sm font-semibold text-text">Rappels</h2>
-        <Switch checked={settings.notify} onChange={(notify) => update({ notify })} label="Prévenir dès qu'un vote est disponible" />
-        {host.extension === 'self' && (
-          <Switch
-            checked={settings.stayOnScreen}
-            onChange={(stayOnScreen) => update({ stayOnScreen })}
-            label="Garder la notification à l'écran jusqu'à ce que je la ferme"
-          />
-        )}
-        <label className="flex flex-wrap items-center justify-between gap-3 text-sm text-text">
-          Relancer si je n'ai pas voté
-          <select
-            value={settings.remindMinutes}
-            onChange={(e) => update({ remindMinutes: Number(e.target.value) })}
-            className="rounded-lg border border-border bg-surface px-2 py-1 text-sm text-text"
-          >
-            <option value={0}>Jamais</option>
-            <option value={5}>Toutes les 5 min</option>
-            <option value={10}>Toutes les 10 min</option>
-            <option value={30}>Toutes les 30 min</option>
-            <option value={60}>Toutes les heures</option>
-          </select>
-        </label>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <Switch checked={settings.quietNight} onChange={(quietNight) => update({ quietNight })} label="Ne pas déranger" />
-          <span className="flex items-center gap-1.5 text-sm text-text">
-            de
-            <select
-              aria-label="Début du silence"
-              disabled={!settings.quietNight}
-              value={settings.quietFrom}
-              onChange={(e) => update({ quietFrom: Number(e.target.value) })}
-              className={selectClass}
-            >
-              {HOURS.map((h) => (
-                <option key={h} value={h}>
-                  {h} h
-                </option>
-              ))}
-            </select>
-            à
-            <select
-              aria-label="Fin du silence"
-              disabled={!settings.quietNight}
-              value={settings.quietTo}
-              onChange={(e) => update({ quietTo: Number(e.target.value) })}
-              className={selectClass}
-            >
-              {HOURS.map((h) => (
-                <option key={h} value={h}>
-                  {h} h
-                </option>
-              ))}
-            </select>
-          </span>
-        </div>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <Switch checked={settings.sound} onChange={(sound) => update({ sound })} label="Jouer un son" />
-          <span className="flex min-w-0 items-center gap-1.5">
-            <select
-              aria-label="Son du rappel"
-              disabled={!settings.sound}
-              value={settings.soundKind}
-              onChange={(e) => {
-                const soundKind = e.target.value as VoteSound;
-                update({ soundKind });
-                playSound(soundKind, settings.volume);
-              }}
-              className={`min-w-0 ${selectClass}`}
-            >
-              {SOUNDS.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={() => playSound(settings.soundKind, settings.volume)}
-              className="rounded-lg border border-border px-2.5 py-1 text-xs text-text-muted hover:text-text"
-            >
-              Tester
-            </button>
-          </span>
-        </div>
-        <label className="flex items-center justify-between gap-3 text-sm text-text">
-          Volume
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.05}
-            disabled={!settings.sound}
-            value={settings.volume}
-            onChange={(e) => update({ volume: Number(e.target.value) })}
-            className="min-w-0 max-w-40 flex-1 disabled:opacity-50"
-          />
-        </label>
-        {host.extension === 'self' && <TestNotification />}
-        <p className="text-xs text-text-muted">
-          {host.extension === 'self'
-            ? 'Les rappels arrivent tant que le navigateur est ouvert, même sans cet écran.'
-            : "Les rappels sont envoyés par l'extension Limeris votes, dans les navigateurs où elle est connectée à ton compte."}
-        </p>
-      </Card>
+        <div className="flex min-w-0 flex-col gap-6">
+          <section className="flex min-w-0 flex-col gap-2">
+            <h2 className={groupTitleClass}>Réglages des rappels</h2>
+            <Card className="flex min-w-0 flex-col divide-y divide-border py-1">
+              <div className={rowClass}>
+                <Switch reverse checked={settings.notify} onChange={(notify) => update({ notify })} label="Prévenir dès qu'un vote est disponible" />
+              </div>
+              <label className={`${rowClass} text-sm text-text`}>
+                Relancer si je n'ai pas voté
+                <select value={settings.remindMinutes} onChange={(e) => update({ remindMinutes: Number(e.target.value) })} className={selectClass}>
+                  <option value={0}>Jamais</option>
+                  <option value={5}>Toutes les 5 min</option>
+                  <option value={10}>Toutes les 10 min</option>
+                  <option value={30}>Toutes les 30 min</option>
+                  <option value={60}>Toutes les heures</option>
+                </select>
+              </label>
+              <div className={rowClass}>
+                <Switch reverse checked={settings.quietNight} onChange={(quietNight) => update({ quietNight })} label="Ne pas déranger" />
+                <span className="flex items-center gap-1.5 text-sm text-text-muted">
+                  de
+                  <select
+                    aria-label="Début du silence"
+                    disabled={!settings.quietNight}
+                    value={settings.quietFrom}
+                    onChange={(e) => update({ quietFrom: Number(e.target.value) })}
+                    className={selectClass}
+                  >
+                    {HOURS.map((h) => (
+                      <option key={h} value={h}>
+                        {h} h
+                      </option>
+                    ))}
+                  </select>
+                  à
+                  <select
+                    aria-label="Fin du silence"
+                    disabled={!settings.quietNight}
+                    value={settings.quietTo}
+                    onChange={(e) => update({ quietTo: Number(e.target.value) })}
+                    className={selectClass}
+                  >
+                    {HOURS.map((h) => (
+                      <option key={h} value={h}>
+                        {h} h
+                      </option>
+                    ))}
+                  </select>
+                </span>
+              </div>
+              <div className={rowClass}>
+                <Switch reverse checked={settings.sound} onChange={(sound) => update({ sound })} label="Jouer un son" />
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <select
+                    aria-label="Son du rappel"
+                    disabled={!settings.sound}
+                    value={settings.soundKind}
+                    onChange={(e) => {
+                      const soundKind = e.target.value as VoteSound;
+                      update({ soundKind });
+                      playSound(soundKind, settings.volume);
+                    }}
+                    className={`min-w-0 ${selectClass}`}
+                  >
+                    {SOUNDS.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => playSound(settings.soundKind, settings.volume)}
+                    className="rounded-lg border border-border px-2.5 py-1 text-xs text-text-muted hover:text-text"
+                  >
+                    Tester
+                  </button>
+                </span>
+              </div>
+              <label className={`${rowClass} text-sm text-text`}>
+                Volume
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  disabled={!settings.sound}
+                  value={settings.volume}
+                  onChange={(e) => update({ volume: Number(e.target.value) })}
+                  className="min-w-0 max-w-40 flex-1 disabled:opacity-50"
+                />
+              </label>
+              {host.extension === 'self' && (
+                <div className="py-3">
+                  <TestNotification />
+                </div>
+              )}
+            </Card>
+            <p className="px-1 text-xs text-text-muted">
+              {host.extension === 'self'
+                ? 'Les rappels arrivent tant que le navigateur est ouvert, même sans cet écran.'
+                : "Les rappels sont envoyés par l'extension Limeris votes, dans les navigateurs où elle est connectée à ton compte."}
+            </p>
+          </section>
 
-      <Card className="flex min-w-0 flex-col gap-3">
-        <h2 className="text-sm font-semibold text-text">Pendant le vote</h2>
-        <div>
-          <p className="mb-1.5 text-xs text-text-muted">Ouvrir les sites de vote dans</p>
-          <div className="flex flex-wrap gap-2">
-            {modes.map((m) => (
-              <button key={m.id} type="button" onClick={() => update({ openMode: m.id })} className={pillClass(settings.openMode === m.id)}>
-                {m.label}
-              </button>
-            ))}
-          </div>
+          <section className="flex min-w-0 flex-col gap-2">
+            <h2 className={groupTitleClass}>Pendant le vote</h2>
+            <Card className="flex min-w-0 flex-col divide-y divide-border py-1">
+              <div className={`${rowClass} text-sm text-text`}>
+                Ouvrir les sites de vote dans
+                <div className="flex gap-1 rounded-lg bg-surface-alt p-1">
+                  {modes.map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      aria-pressed={settings.openMode === m.id}
+                      onClick={() => update({ openMode: m.id })}
+                      className={`rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                        settings.openMode === m.id ? 'bg-surface text-text shadow-sm' : 'text-text-muted hover:text-text'
+                      }`}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className={rowClass}>
+                <Switch reverse checked={settings.chain} onChange={(chain) => update({ chain })} label="Passer seul au site suivant" />
+              </div>
+              <div className="py-3">
+                <p className="text-xs text-text">Conseil : l'extension Buster aide à passer les captchas plus vite.</p>
+                <button type="button" onClick={() => openExternal(BUSTER_URL)} className="mt-1.5 text-left text-xs font-medium text-accent">
+                  Voir Buster sur le Chrome Web Store
+                </button>
+              </div>
+            </Card>
+            <p className="px-1 text-xs text-text-muted">
+              Limeris ne vote pas à ta place : tu valides le captcha sur chaque site, et le site du serveur confirme
+              ensuite le vote et donne la récompense.
+            </p>
+          </section>
         </div>
-        <Switch checked={settings.chain} onChange={(chain) => update({ chain })} label="Passer seul au site suivant" />
-        <div className="rounded-lg border border-border px-3 py-2.5">
-          <p className="text-xs text-text">Conseil : l'extension Buster aide à passer les captchas plus vite.</p>
-          <button type="button" onClick={() => openExternal(BUSTER_URL)} className="mt-1.5 text-left text-xs font-medium text-accent">
-            Voir Buster sur le Chrome Web Store
-          </button>
-        </div>
-        <p className="text-xs text-text-muted">
-          Limeris ne vote pas à ta place : tu valides le captcha sur chaque site, et le site du serveur confirme
-          ensuite le vote et donne la récompense.
-        </p>
-      </Card>
+      </div>
 
-      <Card className="flex min-w-0 items-center gap-3 md:col-span-2">
+      <div className="flex min-w-0 items-center gap-3 border-t border-border pt-4">
         <a href={SITE_URL} target="_blank" rel="noreferrer" title="Ouvrir limeris.fr" className="shrink-0">
           <img src={assetUrl('icons/128.png')} alt="Limeris" width={40} height={40} className="h-10 w-10 rounded-xl" />
         </a>
@@ -488,7 +542,7 @@ function SettingsTab() {
           </p>
           <p className="text-xs text-text-muted">© 2026 Sliver91. Tous droits réservés.</p>
         </div>
-      </Card>
+      </div>
     </div>
   );
 }

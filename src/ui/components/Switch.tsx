@@ -3,11 +3,13 @@ interface SwitchProps {
   onChange: (checked: boolean) => void;
   label?: string;
   disabled?: boolean;
+  /** Libellé à gauche, interrupteur à droite : pour une ligne de réglage. */
+  reverse?: boolean;
 }
 
-export function Switch({ checked, onChange, label, disabled }: SwitchProps) {
+export function Switch({ checked, onChange, label, disabled, reverse }: SwitchProps) {
   return (
-    <label className="flex min-w-0 items-center gap-3 cursor-pointer select-none">
+    <label className={`flex min-w-0 items-center gap-3 cursor-pointer select-none ${reverse ? 'w-full flex-row-reverse justify-between' : ''}`}>
       <button
         type="button"
         role="switch"
