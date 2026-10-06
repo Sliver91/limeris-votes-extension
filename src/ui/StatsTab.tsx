@@ -88,23 +88,22 @@ function median(values: number[]): number {
   return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
-/** Jours complets du mois qu'il faut avant d'oser un pronostic. */
-const FORECAST_MIN_DAYS = 3;
-
 /**
  * Pronostic du total de votes à la fin du mois, si l'on reste aussi régulier : ce qui est déjà
- * voté, plus la médiane des jours complets du mois pour chaque jour restant. La médiane, pas la
- * moyenne : un jour exceptionnel (rien voté, ou tout rattrapé) ne fausse pas l'estimation.
+ * voté, plus la médiane des jours où l'on a voté pour chaque jour restant. Tous les votes comptent,
+ * validés à la main compris (ce sont souvent les plus nombreux). Les jours sans aucun vote sont
+ * laissés de côté : avant la première utilisation ou pendant une absence, ils ramèneraient la
+ * médiane à zéro. La médiane, pas la moyenne : un jour exceptionnel ne fausse pas l'estimation.
  * `dayVotes` : votes de chaque jour du mois jusqu'à aujourd'hui compris (incomplet, hors médiane).
  */
 function monthForecast(dayVotes: number[], total: number, now: number): { total: number; perDay: number; days: number } | null {
-  const past = dayVotes.slice(0, -1);
-  if (past.length < FORECAST_MIN_DAYS) return null;
-  const perDay = median(past);
+  const voted = dayVotes.slice(0, -1).filter((votes) => votes > 0);
+  if (voted.length === 0) return null;
+  const perDay = median(voted);
   const date = new Date(now);
   const daysLeft = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate() - date.getDate();
   const today = dayVotes[dayVotes.length - 1] ?? 0;
-  return { total: Math.round(total + Math.max(0, perDay - today) + perDay * daysLeft), perDay, days: past.length };
+  return { total: Math.round(total + Math.max(0, perDay - today) + perDay * daysLeft), perDay, days: voted.length };
 }
 
 function niceMax(n: number): number {
@@ -297,11 +296,12 @@ export function StatsTab() {
                   <p className="font-mono text-2xl font-medium tabular-nums text-text">≈ {forecast.total} votes</p>
                   <p className="text-xs text-text-muted">
                     Si tu restes aussi régulier : médiane de {forecast.perDay.toLocaleString('fr-FR')} vote{forecast.perDay > 1 ? 's' : ''} par
-                    jour sur les {forecast.days} jours écoulés.
+                    jour sur {forecast.days > 1 ? `tes ${forecast.days} jours de vote` : 'ton jour de vote'} du mois, votes validés à la main
+                    compris.
                   </p>
                 </>
               ) : (
-                <p className="text-xs text-text-muted">Disponible après {FORECAST_MIN_DAYS} jours complets dans le mois.</p>
+                <p className="text-xs text-text-muted">Disponible dès demain, après un premier jour de vote complet ce mois-ci.</p>
               )}
             </div>
           )}
@@ -312,7 +312,7 @@ export function StatsTab() {
             </div>
             <div>
               <p className="font-mono text-xl font-medium tabular-nums text-text">{stats.manual}</p>
-              <p className="text-xs text-text-muted">validés à la main</p>
+              <p className="text-xs text-text-muted">dont validés à la main</p>
             </div>
           </div>
         </Card>
