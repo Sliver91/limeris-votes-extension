@@ -197,7 +197,9 @@ export function StatsTab() {
   const bestHour = stats.hours.indexOf(Math.max(...stats.hours));
   const diff = stats.votes - previous.votes;
   const sites = [...stats.sites.entries()].sort((a, b) => b[1].votes - a[1].votes);
-
+  const topVotes = Math.max(1, ...sites.map(([, c]) => c.votes));
+  const rate = successRate(stats);
+  const periodName = period === '30' ? 'sur 30 jours' : `en ${monthName(period === 'cur' ? now : prevMonthStart)}`;
 
   return (
     <div className="flex flex-col gap-4">
@@ -209,8 +211,8 @@ export function StatsTab() {
             onClick={() => setPeriod(p.id)}
             aria-pressed={period === p.id}
             aria-label={p.label}
-            className={`rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors sm:px-3 ${
-              period === p.id ? 'border-accent bg-accent-soft text-text' : 'border-border text-text-muted hover:text-text'
+            className={`min-h-9 rounded-full border px-3 text-xs font-medium transition-colors ${
+              period === p.id ? 'border-text bg-text text-bg' : 'border-border bg-surface text-text-muted hover:text-text'
             }`}
           >
             <span className="capitalize sm:hidden">{p.short}</span>
@@ -222,7 +224,7 @@ export function StatsTab() {
             value={scope}
             onChange={(e) => setScope(e.target.value)}
             aria-label="Serveur"
-            className="ml-auto rounded-lg border border-border bg-surface px-2 py-1.5 text-xs text-text"
+            className="ml-auto min-h-9 rounded-lg border border-border bg-surface px-2 text-xs text-text"
           >
             <option value="all">Tous les serveurs</option>
             {servers.map((s) => (
@@ -234,74 +236,86 @@ export function StatsTab() {
         )}
       </div>
 
-      <Card className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <div>
-          <p className="text-2xl font-semibold tabular-nums text-text">{stats.votes}</p>
-          <p className="text-xs text-text-muted">
-            votes · {diff >= 0 ? '+' : '−'}
-            {Math.abs(diff)} par rapport à la période d'avant
-          </p>
-        </div>
-        <div>
-          <p className="text-2xl font-semibold tabular-nums text-text">{successRate(stats)} %</p>
-          <p className="text-xs text-text-muted">de réussite (votes faits ÷ rappels reçus)</p>
-        </div>
-        <div>
-          <p className="text-2xl font-semibold tabular-nums text-text">{missed(stats)}</p>
-          <p className="text-xs text-text-muted">votes manqués</p>
-        </div>
-        <div>
-          <p className="text-2xl font-semibold tabular-nums text-text">{stats.manual}</p>
-          <p className="text-xs text-text-muted">dont validés à la main</p>
-        </div>
-      </Card>
-
-      {stats.votes + stats.chances === 0 ? (
-        <Card>
-          <p className="text-sm text-text-muted">
-            Rien sur cette période. Les statistiques se remplissent au fil de tes votes faits depuis l'extension.
-          </p>
-        </Card>
-      ) : (
-        <>
-          <div className="grid gap-4 md:grid-cols-5">
-            <Card className="md:col-span-3">
-              <h2 className="mb-2 text-sm font-semibold text-text">Votes par jour</h2>
-              <BarChart bars={dayBars} ariaLabel="Votes par jour" />
-            </Card>
-            <Card className="md:col-span-2">
-              <h2 className="mb-2 text-sm font-semibold text-text">Heures où je vote le plus</h2>
-              <BarChart bars={hourBars} ariaLabel="Votes par heure de la journée" />
-              {stats.votes > 0 && (
-                <p className="mt-2 text-xs text-text-muted">
-                  Surtout entre {bestHour} h et {bestHour + 1} h.
-                </p>
-              )}
-            </Card>
+      <div className="grid gap-4 md:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+        {/* Le chiffre de la période, en grand, puis ce qui l'explique. */}
+        <Card className="flex min-w-0 flex-col gap-4 p-5">
+          <div className="flex flex-wrap items-end gap-x-3 gap-y-1">
+            <p className="font-mono text-6xl font-medium leading-none tabular-nums text-accent">{stats.votes}</p>
+            <div className="pb-0.5">
+              <p className="text-base font-semibold leading-tight text-text">
+                vote{stats.votes > 1 ? 's' : ''} {periodName}
+              </p>
+              <p className={`text-xs font-medium ${diff >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-text-muted'}`}>
+                {diff >= 0 ? '+' : '−'}
+                {Math.abs(diff)} par rapport à la période d'avant
+              </p>
+            </div>
           </div>
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-baseline justify-between gap-2 text-xs text-text">
+              <span>
+                Réussite <span className="text-text-muted">(votes faits ÷ rappels reçus)</span>
+              </span>
+              <span className="shrink-0 whitespace-nowrap font-mono font-medium tabular-nums">{rate} %</span>
+            </div>
+            <div className="h-2 rounded-full bg-surface-alt" role="img" aria-label={`${rate} % de réussite`}>
+              <div className="h-2 rounded-full bg-accent" style={{ width: `${rate}%` }} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3 border-t border-border pt-3">
+            <div>
+              <p className="font-mono text-xl font-medium tabular-nums text-text">{missed(stats)}</p>
+              <p className="text-xs text-text-muted">votes manqués</p>
+            </div>
+            <div>
+              <p className="font-mono text-xl font-medium tabular-nums text-text">{stats.manual}</p>
+              <p className="text-xs text-text-muted">validés à la main</p>
+            </div>
+          </div>
+        </Card>
 
+        {stats.votes + stats.chances === 0 ? (
           <Card>
-            <h2 className="mb-2 text-sm font-semibold text-text">Par site de vote</h2>
-            <table className="w-full text-sm tabular-nums">
-              <thead>
-                <tr className="text-xs text-text-muted">
-                  <th className="py-1 text-left font-medium">Site</th>
-                  <th className="py-1 text-right font-medium">Votés</th>
-                  <th className="py-1 text-right font-medium">Manqués</th>
-                  <th className="py-1 text-right font-medium">Réussite</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {sites.map(([host, c]) => (
-                  <tr key={host}>
-                    <td className="break-all py-1.5 text-text">{host}</td>
-                    <td className="py-1.5 text-right text-text">{c.votes}</td>
-                    <td className="py-1.5 text-right text-text">{missed(c)}</td>
-                    <td className="py-1.5 text-right text-text">{successRate(c)} %</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <p className="text-sm text-text-muted">
+              Rien sur cette période. Les statistiques se remplissent au fil de tes votes faits depuis l'extension.
+            </p>
+          </Card>
+        ) : (
+          <Card className="min-w-0">
+            <h2 className="mb-2 text-sm font-semibold text-text">Votes par jour</h2>
+            <BarChart bars={dayBars} ariaLabel="Votes par jour" />
+          </Card>
+        )}
+      </div>
+
+      {stats.votes + stats.chances > 0 && (
+        <>
+          <Card className="flex min-w-0 flex-col gap-3">
+            <h2 className="text-sm font-semibold text-text">Par site de vote</h2>
+            {sites.map(([host, c]) => (
+              <div key={host} className="flex min-w-0 flex-col gap-1">
+                <div className="flex items-baseline justify-between gap-3 text-sm">
+                  <span className="min-w-0 break-all text-text">{host}</span>
+                  <span className="shrink-0 text-xs text-text-muted">
+                    {missed(c)} manqué{missed(c) > 1 ? 's' : ''} · {successRate(c)} % ·{' '}
+                    <span className="font-mono text-sm tabular-nums text-text">{c.votes}</span>
+                  </span>
+                </div>
+                <div className="h-1.5 rounded-full bg-surface-alt">
+                  <div className="h-1.5 rounded-full bg-accent" style={{ width: `${(100 * c.votes) / topVotes}%` }} />
+                </div>
+              </div>
+            ))}
+          </Card>
+
+          <Card className="min-w-0">
+            <h2 className="mb-2 text-sm font-semibold text-text">Heures où je vote le plus</h2>
+            <BarChart bars={hourBars} ariaLabel="Votes par heure de la journée" />
+            {stats.votes > 0 && (
+              <p className="mt-2 text-xs text-text-muted">
+                Surtout entre {bestHour} h et {bestHour + 1} h.
+              </p>
+            )}
           </Card>
         </>
       )}
