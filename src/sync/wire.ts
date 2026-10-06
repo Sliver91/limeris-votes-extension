@@ -214,6 +214,8 @@ function applySettings(remote: WireSettings, local: VoteSettings): VoteSettings 
     volume: remote.volume,
     openMode: remote.modeOuverture,
     chain: remote.enchainer,
+    // Réglage d'affichage, gardé tel qu'il est sur cet appareil : le compte Limeris ne le connaît pas.
+    showTime: local.showTime,
   };
 }
 

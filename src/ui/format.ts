@@ -22,3 +22,12 @@ export function formatDelay(minutes: number): string {
   if (h === 0) return `${m} min`;
   return m === 0 ? `${h} h` : `${h} h ${String(m).padStart(2, '0')}`;
 }
+
+/** Heure d'un prochain vote : "à 15 h 12", "demain à 9 h 05", ou "mer. à 9 h 05" au-delà. */
+export function formatClock(at: number, now: number): string {
+  const date = new Date(at);
+  const time = `à ${date.getHours()} h ${String(date.getMinutes()).padStart(2, '0')}`;
+  const days = Math.round((new Date(at).setHours(0, 0, 0, 0) - new Date(now).setHours(0, 0, 0, 0)) / 86_400_000);
+  if (days <= 0) return time;
+  return `${days === 1 ? 'demain' : date.toLocaleDateString('fr-FR', { weekday: 'short' })} ${time}`;
+}
