@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { csrfToken, normalizeBase, parseSites } from './parse';
+import { csrfToken, normalizeBase, parseSites, parseVoteLinks } from './parse';
 import { checkUser, fetchSites } from './client';
 
 // Mêmes cas que les tests de minecraft_votes.rs.
@@ -64,4 +64,19 @@ describe.runIf(liveSite && livePseudo)('site réel', () => {
     console.log(`votes du mois : ${status.votes} |`, status.sites);
     expect(typeof status.votes).toBe('number');
   }, 30_000);
+});
+
+describe('parseVoteLinks', () => {
+  it('garde un lien par ligne, sans doublon', () => {
+    expect(parseVoteLinks(' https://top-serveurs.net/arksa/fr-larche-oubliee-694ac9ebd4609\n\nserveur-prive.net/ark/mon-serveur\nhttps://top-serveurs.net/arksa/fr-larche-oubliee-694ac9ebd4609')).toEqual([
+      'https://top-serveurs.net/arksa/fr-larche-oubliee-694ac9ebd4609',
+      'https://serveur-prive.net/ark/mon-serveur',
+    ]);
+  });
+
+  it('refuse ce qui n\'est pas un lien http', () => {
+    expect(() => parseVoteLinks('javascript:alert(1)')).toThrow('BAD_URL');
+    expect(() => parseVoteLinks('pas un lien')).toThrow('BAD_URL');
+    expect(() => parseVoteLinks('  ')).toThrow('BAD_URL');
+  });
 });

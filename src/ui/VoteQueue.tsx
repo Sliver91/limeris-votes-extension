@@ -2,12 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { Card } from './components/Card';
 import { Button } from './components/Button';
+import { Gauge } from './components/Gauge';
 import { confirmVote } from '../azuriom/client';
 import { closeSite, openSite as openSiteTab, useHost } from '../platform';
 import { describeVoteError, refreshServer, siteLink } from './api';
 import { formatDelay } from './format';
 import { CopyPseudoButton, copyPseudo } from './CopyPseudoButton';
-import { useVoteHistoryStore, useVoteStore, type VoteServer, type VoteSite } from '../store/store';
+import { isDirect, useVoteHistoryStore, useVoteStore, type VoteServer, type VoteSite } from '../store/store';
 
 /** Même rythme que la page de vote du site : assez lent pour rester sous sa limite d'appels. */
 const POLL_INTERVAL_MS = 5_000;
@@ -20,7 +21,7 @@ const NEXT_DELAY_MS = 1_800;
 /** Délais proposés quand on valide un vote à la main (le site du serveur ne les publie pas). */
 const MANUAL_DELAYS_MIN = [90, 120, 180, 720, 1440];
 /** Délai présélectionné la première fois, pour les sites de vote les plus courants. */
-const USUAL_DELAY_MIN: Record<string, number> = {
+export const USUAL_DELAY_MIN: Record<string, number> = {
   'serveur-minecraft.com': 180,
   'serveur-prive.net': 90,
   'top-serveurs.net': 120,
@@ -46,7 +47,7 @@ interface VoteQueueProps {
 export function VoteQueue({ server, siteIds, onClose }: VoteQueueProps) {
   const settings = useVoteStore((s) => s.settings);
   /** Faux quand l'hôte ne peut pas interroger le site du serveur : seul « J'ai voté » valide alors le vote. */
-  const canConfirm = useHost().confirm;
+  const canConfirm = useHost().confirm && !isDirect(server);
   const [index, setIndex] = useState(0);
   const [phase, setPhase] = useState<Phase>('waiting');
   const [message, setMessage] = useState<string | null>(null);
@@ -246,6 +247,7 @@ export function VoteQueue({ server, siteIds, onClose }: VoteQueueProps) {
   if (!site) {
     return (
       <Card className="flex flex-col gap-3">
+        <Gauge value={1} tone="emerald" label="File de vote terminée" />
         <h2 className="text-lg font-semibold text-text">
           {confirmed} vote{confirmed > 1 ? 's' : ''} confirmé{confirmed > 1 ? 's' : ''}
         </h2>
@@ -285,6 +287,7 @@ export function VoteQueue({ server, siteIds, onClose }: VoteQueueProps) {
           Arrêter
         </button>
       </div>
+      <Gauge value={(index + (finished ? 1 : 0)) / siteIds.length} label="Avancement de la file de vote" />
 
       <div>
         <h2 className="break-words text-lg font-semibold text-text">{site.host}</h2>

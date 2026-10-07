@@ -1,18 +1,19 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { BarChart3, BellRing, Pencil, Plus, RefreshCw, Settings2, Vote, X } from 'lucide-react';
+import { BarChart3, BellRing, CheckCircle2, Pencil, Plus, RefreshCw, Settings2, Vote, X } from 'lucide-react';
 import { Card } from './components/Card';
 import { Button } from './components/Button';
 import { Switch } from './components/Switch';
+import { Gauge } from './components/Gauge';
 import { normalizeBase } from '../azuriom/parse';
 import { ERR } from '../azuriom/errors';
 import { playSound, SOUNDS } from '../lib/sound';
 import { appVersion, assetUrl, scheduleTestNotification, onPendingQueue, onPendingTab, openExtension, openExternal, requestSiteAccess, takePendingQueue, takePendingTab, useHost } from '../platform';
 import { AccountSection } from '../account/AccountSection';
 import { formatClock, formatLeft, relativeTime } from './format';
-import { describeVoteError, importServer, refreshServer } from './api';
-import { isAvailable, useVoteStore, type OpenMode, type VoteServer, type VoteSite, type VoteSound } from '../store/store';
+import { describeVoteError, directServer, importServer, refreshServer } from './api';
+import { isAvailable, isDirect, useVoteStore, type OpenMode, type VoteServer, type VoteSite, type VoteSound } from '../store/store';
 import { useNow } from './useNow';
-import { VoteQueue } from './VoteQueue';
+import { USUAL_DELAY_MIN, VoteQueue } from './VoteQueue';
 import { StatsTab } from './StatsTab';
 import { CopyPseudoButton } from './CopyPseudoButton';
 import { Brand, SITE_URL, SiteLink } from './Brand';
@@ -113,6 +114,92 @@ function AddServerForm({ onDone, onCancel }: { onDone: () => void; onCancel?: ()
   );
 }
 
+/** Serveur sans site propre (ARK, Rust…) : on enregistre directement ses liens de vote. */
+function DirectLinkForm({ onDone, onCancel }: { onDone: () => void; onCancel?: () => void }) {
+  const addServer = useVoteStore((s) => s.addServer);
+  const [name, setName] = useState('');
+  const [pseudo, setPseudo] = useState('');
+  const [links, setLinks] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    try {
+      addServer(directServer(name.trim(), links, pseudo.trim()));
+      onDone();
+    } catch {
+      setError("Un de ces liens n'est pas valide. Colle le lien de vote complet, par exemple https://top-serveurs.net/arksa/mon-serveur.");
+    }
+  }
+
+  return (
+    <Card>
+      <form onSubmit={submit} className="flex flex-col gap-3">
+        <h2 className="text-sm font-semibold text-text">Ajouter un serveur par son lien de vote</h2>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="flex flex-col gap-1 text-xs text-text-muted">
+            Nom du serveur
+            <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} placeholder="L'Arche oubliée" maxLength={100} required />
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-text-muted">
+            Ton pseudo en jeu
+            <input className={inputClass} value={pseudo} onChange={(e) => setPseudo(e.target.value)} placeholder="Pseudo" maxLength={32} required />
+          </label>
+        </div>
+        <label className="flex flex-col gap-1 text-xs text-text-muted">
+          Lien de vote (un par ligne s'il y en a plusieurs)
+          <textarea
+            className={`${inputClass} min-h-20 resize-y`}
+            value={links}
+            onChange={(e) => setLinks(e.target.value)}
+            placeholder="https://top-serveurs.net/arksa/mon-serveur"
+            required
+          />
+        </label>
+        {error && <p className="text-xs text-red-500">{error}</p>}
+        <div className="flex gap-2">
+          <Button type="submit">Ajouter</Button>
+          {onCancel && (
+            <Button type="button" variant="ghost" onClick={onCancel}>
+              Annuler
+            </Button>
+          )}
+        </div>
+        <p className="text-xs text-text-muted">
+          Pour les serveurs qui n'ont pas de site à eux (ARK, Rust…) et donnent seulement leur page sur un site de
+          vote. Limeris ne peut pas vérifier ces votes : après avoir voté, clique sur « J'ai voté » et choisis le
+          délai, le rappel suit.
+        </p>
+      </form>
+    </Card>
+  );
+}
+
+/** Ajout d'un serveur : par son site (Azuriom), ou par ses liens de vote quand il n'a pas de site. */
+function AddServer({ onDone, onCancel }: { onDone: () => void; onCancel?: () => void }) {
+  const host = useHost();
+  const [direct, setDirect] = useState(false);
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="grid grid-cols-2 gap-1.5">
+        <button type="button" aria-pressed={!direct} onClick={() => setDirect(false)} className={pillClass(!direct)}>
+          Site du serveur
+        </button>
+        <button type="button" aria-pressed={direct} onClick={() => setDirect(true)} className={pillClass(direct)}>
+          Lien de vote direct
+        </button>
+      </div>
+      {direct ? (
+        <DirectLinkForm onDone={onDone} onCancel={onCancel} />
+      ) : host.addServers ? (
+        <AddServerForm onDone={onDone} onCancel={onCancel} />
+      ) : (
+        <ExtensionNeeded onCancel={onCancel} />
+      )}
+    </div>
+  );
+}
+
 /** Affiché à la place du formulaire d'ajout quand l'hôte ne peut pas lire le site d'un serveur. */
 function ExtensionNeeded({ onCancel }: { onCancel?: () => void }) {
   const host = useHost();
@@ -158,6 +245,38 @@ function RemoveServerButton({ server }: { server: VoteServer }) {
   );
 }
 
+/** Teinte propre à chaque site de vote, tirée de son nom : la même partout et d'une visite à l'autre. */
+function hostHue(host: string): number {
+  let hue = 0;
+  for (let i = 0; i < host.length; i++) hue = (hue * 31 + host.charCodeAt(i)) % 360;
+  return hue;
+}
+
+/** Pastille de couleur avec l'initiale du site de vote, pour le repérer d'un coup d'œil. */
+function HostBadge({ host }: { host: string }) {
+  return (
+    <span
+      aria-hidden
+      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[11px] font-bold uppercase text-white"
+      style={{ background: `hsl(${hostHue(host)} 65% 42%)` }}
+    >
+      {host.charAt(0)}
+    </span>
+  );
+}
+
+/**
+ * Part du délai déjà écoulée (0 à 1), ou null si sa durée n'est pas connue. Le délai part du
+ * dernier changement du site ; à défaut, on prend la durée habituelle de ce site de vote.
+ */
+function cooldownProgress(site: VoteSite, now: number): number | null {
+  if (site.nextAt === null) return null;
+  const usual = site.manualDelayMin ?? USUAL_DELAY_MIN[site.host];
+  const total = site.updatedAt && site.updatedAt < site.nextAt ? site.nextAt - site.updatedAt : usual ? usual * 60_000 : null;
+  if (total === null) return null;
+  return Math.min(1, Math.max(0, 1 - (site.nextAt - now) / total));
+}
+
 const timeInputClass = 'w-12 rounded-lg border border-border bg-surface px-1.5 py-1 text-base tabular-nums text-text';
 
 /**
@@ -170,6 +289,7 @@ function SiteTile({ serverId, site, now, showTime, onVote }: { serverId: string;
   const [hours, setHours] = useState('0');
   const [minutes, setMinutes] = useState('0');
   const available = isAvailable(site, now);
+  const progress = cooldownProgress(site, now);
 
   function openEdit() {
     // Site en attente : le temps restant. Site disponible : le dernier délai choisi pour lui.
@@ -220,15 +340,20 @@ function SiteTile({ serverId, site, now, showTime, onVote }: { serverId: string;
   }
 
   return (
-    <div className={`flex min-w-0 flex-col gap-2 rounded-xl border bg-surface p-3 shadow-sm ${available ? 'border-accent' : 'border-border'}`}>
+    <div
+      className={`flex min-w-0 flex-col gap-2 rounded-xl border p-3 shadow-sm ${
+        available ? 'border-emerald-500 bg-emerald-500/10' : 'border-border bg-surface'
+      }`}
+    >
       <div className="flex items-center justify-between gap-1">
-        {available ? (
-          <p className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-            <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" /> Disponible
-          </p>
-        ) : (
-          <p className="text-xs text-text-muted">Revient dans</p>
-        )}
+        <span className="flex min-w-0 items-center gap-1.5">
+          <HostBadge host={site.host} />
+          {available ? (
+            <span className="truncate text-xs font-semibold text-emerald-600 dark:text-emerald-400">Disponible</span>
+          ) : (
+            <span className="truncate text-xs font-medium text-amber-600 dark:text-amber-400">Revient dans</span>
+          )}
+        </span>
         <button
           type="button"
           onClick={openEdit}
@@ -249,7 +374,7 @@ function SiteTile({ serverId, site, now, showTime, onVote }: { serverId: string;
         <button
           type="button"
           onClick={onVote}
-          className="mt-auto min-h-11 rounded-lg bg-accent-soft text-sm font-semibold text-text transition-colors hover:bg-accent hover:text-[var(--accent-contrast)]"
+          className="mt-auto min-h-11 rounded-lg bg-emerald-600 text-sm font-semibold text-white transition-colors hover:bg-emerald-700"
         >
           Voter
         </button>
@@ -259,6 +384,7 @@ function SiteTile({ serverId, site, now, showTime, onVote }: { serverId: string;
             <p className="font-mono text-xl font-medium tabular-nums text-text">{formatLeft((site.nextAt ?? now) - now)}</p>
             {showTime && site.nextAt !== null && <p className="text-xs text-text-muted">{formatClock(site.nextAt, now)}</p>}
           </div>
+          {progress !== null && <Gauge value={progress} tone="amber" label={`Délai écoulé pour ${site.host}`} className="!h-1.5" />}
           {/* Toujours cliquable, même pendant le délai : le compte à rebours peut se tromper. */}
           <button
             type="button"
@@ -304,11 +430,8 @@ function VotesTab() {
 
   const server = servers.find((s) => s.id === currentId) ?? servers[0];
 
-  if ((!server || adding) && !host.addServers) {
-    return <ExtensionNeeded onCancel={server ? () => setAdding(false) : undefined} />;
-  }
   if (!server || adding) {
-    return <AddServerForm onDone={() => setAdding(false)} onCancel={server ? () => setAdding(false) : undefined} />;
+    return <AddServer onDone={() => setAdding(false)} onCancel={server ? () => setAdding(false) : undefined} />;
   }
 
   async function refresh() {
@@ -322,6 +445,9 @@ function VotesTab() {
   );
   const ready = sorted.filter((s) => isAvailable(s, now));
   const nextSite = sorted.find((s) => !isAvailable(s, now));
+  const voted = server.sites.length - ready.length;
+  // Serveur ajouté par lien de vote : pas de site de serveur à relire.
+  const direct = isDirect(server);
 
   const voteLabel = ready.length > 1 ? `Voter les ${ready.length} à la suite` : 'Voter maintenant';
   const startAll = () => setQueue(ready.map((s) => s.id));
@@ -344,7 +470,8 @@ function VotesTab() {
                 active ? 'bg-surface text-text shadow-sm' : 'text-text-muted hover:text-text'
               }`}
             >
-              {s.name} <span className={`font-mono ${active ? 'text-accent' : ''}`}>{count}</span>
+              {s.name}{' '}
+              <span className={`rounded-full px-1.5 py-0.5 font-mono text-[11px] ${count > 0 ? 'bg-emerald-500 text-white' : ''}`}>{count}</span>
             </button>
           );
         })}
@@ -354,9 +481,10 @@ function VotesTab() {
         <VoteQueue server={server} siteIds={queue} onClose={() => setQueue(null)} />
       ) : (
         <>
-          <Card className="flex flex-wrap items-center gap-3">
+          <Card className={`flex flex-wrap items-center gap-3 ${ready.length === 0 ? '!border-emerald-500' : ''}`}>
             <div className="min-w-0 flex-1 basis-40">
-              <p className="text-lg font-semibold leading-tight text-text">
+              <p className="flex items-center gap-1.5 text-lg font-semibold leading-tight text-text">
+                {ready.length === 0 && <CheckCircle2 size={18} className="shrink-0 text-emerald-500" />}
                 {ready.length > 0
                   ? `${ready.length} vote${ready.length > 1 ? 's' : ''} disponible${ready.length > 1 ? 's' : ''}`
                   : 'Tout est voté'}
@@ -373,9 +501,16 @@ function VotesTab() {
                 {voteLabel}
               </Button>
             </div>
+            {/* Jauge d'avancement : part des sites déjà votés (ceux dont le délai court). */}
+            <div className="flex basis-full items-center gap-2.5">
+              <Gauge value={server.sites.length > 0 ? voted / server.sites.length : 0} tone={ready.length === 0 ? 'emerald' : 'gradient'} label="Sites déjà votés" className="flex-1" />
+              <span className="shrink-0 font-mono text-xs text-text-muted">
+                <span className="font-medium text-text">{voted}</span> / {server.sites.length} voté{voted > 1 ? 's' : ''}
+              </span>
+            </div>
           </Card>
 
-          {server.error && <p className="text-xs text-red-500">{describeVoteError(server.error)}</p>}
+          {server.error && !direct && <p className="text-xs text-red-500">{describeVoteError(server.error)}</p>}
 
           {/* Une tuile par site de vote : deux colonnes dans le panneau latéral et sur téléphone. */}
           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
@@ -399,7 +534,7 @@ function VotesTab() {
               {server.lastCheckedAt && <span>· vérifié {relativeTime(server.lastCheckedAt, now)}</span>}
             </span>
             <span className="flex items-center gap-4">
-              {host.refresh && (
+              {host.refresh && !direct && (
                 <button type="button" onClick={refresh} disabled={refreshing} className="flex items-center gap-1 hover:text-text">
                   <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} /> Actualiser
                 </button>
