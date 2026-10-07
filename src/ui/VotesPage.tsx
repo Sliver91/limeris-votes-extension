@@ -604,6 +604,16 @@ function SettingsTab() {
               <div className={rowClass}>
                 <Switch reverse checked={settings.notify} onChange={(notify) => update({ notify })} label="Prévenir dès qu'un vote est disponible" />
               </div>
+              {host.extension === 'self' && (
+                <div className={rowClass}>
+                  <Switch
+                    reverse
+                    checked={settings.stayOnScreen}
+                    onChange={(stayOnScreen) => update({ stayOnScreen })}
+                    label="Garder la notification à l'écran jusqu'à ce que je la ferme"
+                  />
+                </div>
+              )}
               <label className={`${rowClass} text-sm text-text`}>
                 Relancer si je n'ai pas voté
                 <select value={settings.remindMinutes} onChange={(e) => update({ remindMinutes: Number(e.target.value) })} className={selectClass}>
