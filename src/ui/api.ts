@@ -1,5 +1,6 @@
 import { checkUser, fetchSites } from '../azuriom/client';
-import { useVoteStore, type VoteServer } from '../store/store';
+import { hostOf, normalizeBase, parseVoteLinks } from '../azuriom/parse';
+import { isDirect, shortHash, useVoteStore, type VoteServer } from '../store/store';
 
 export { describeVoteError } from '../azuriom/errors';
 
@@ -35,10 +36,36 @@ export async function importServer(address: string, pseudo: string): Promise<Vot
   };
 }
 
+/** Prépare un serveur sans site Azuriom à partir de ses liens de vote : un site de vote par lien. */
+export function directServer(name: string, links: string, pseudo: string): VoteServer {
+  const urls = parseVoteLinks(links);
+  const now = Date.now();
+  return {
+    id: crypto.randomUUID(),
+    name,
+    baseUrl: normalizeBase(urls[0]),
+    pseudo,
+    monthVotes: null,
+    lastCheckedAt: null,
+    error: null,
+    sites: urls.map((url) => ({
+      id: `d_${shortHash(url)}`,
+      url,
+      // Pas de route de confirmation : c'est ce qui distingue ces serveurs (voir isDirect).
+      voteUrl: url,
+      host: hostOf(url),
+      label: '',
+      nextAt: null,
+      notified: true,
+      lastRemindAt: now,
+    })),
+  };
+}
+
 /** Redemande au site du serveur l'heure du prochain vote de chaque site. */
 export async function refreshServer(serverId: string): Promise<void> {
   const server = useVoteStore.getState().servers.find((s) => s.id === serverId);
-  if (!server) return;
+  if (!server || isDirect(server)) return;
   try {
     const status = await checkUser(server.baseUrl, server.pseudo);
     useVoteStore.getState().applyStatus(serverId, status.sites, status.votes);

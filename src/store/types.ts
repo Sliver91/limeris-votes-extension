@@ -42,6 +42,15 @@ export interface VoteServer {
   error: string | null;
 }
 
+/**
+ * Serveur sans site Azuriom (ARK, Rust…), ajouté par ses liens de vote : aucun de ses sites n'a de
+ * route de confirmation (`voteUrl` vaut `url`). Rien n'est lu sur un site de serveur, chaque vote
+ * se valide à la main.
+ */
+export function isDirect(server: VoteServer): boolean {
+  return server.sites.length > 0 && server.sites.every((site) => site.voteUrl === site.url);
+}
+
 export type OpenMode = 'tab' | 'window';
 
 /** Sons de rappel livrés avec l'extension (public/sounds). */

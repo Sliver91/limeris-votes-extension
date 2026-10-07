@@ -30,6 +30,29 @@ export function normalizeBase(input: string): string {
   return `${url.protocol}//${url.host}${path.endsWith('/vote') ? path.slice(0, -'/vote'.length) : path}`;
 }
 
+/**
+ * Liens de vote collés à la main (un par ligne), pour un serveur sans site Azuriom. Seuls http et
+ * https sont acceptés ; un lien répété n'est gardé qu'une fois.
+ */
+export function parseVoteLinks(input: string): string[] {
+  const links: string[] = [];
+  for (const line of input.split(/\s+/)) {
+    if (!line) continue;
+    let url: URL;
+    try {
+      url = new URL(line.includes('://') ? line : `https://${line}`);
+    } catch {
+      throw new Error(ERR.BAD_URL);
+    }
+    if ((url.protocol !== 'http:' && url.protocol !== 'https:') || !url.hostname.includes('.')) {
+      throw new Error(ERR.BAD_URL);
+    }
+    if (!links.includes(url.href)) links.push(url.href);
+  }
+  if (links.length === 0) throw new Error(ERR.BAD_URL);
+  return links;
+}
+
 export function hostOf(url: string): string {
   try {
     return new URL(url).hostname.replace(/^(www\.)+/, '');
