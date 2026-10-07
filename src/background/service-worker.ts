@@ -14,7 +14,7 @@ import {
   syncNow,
 } from '../sync/limeris';
 import { syncFingerprint } from '../sync/wire';
-import { applyStatus, setServerError, type VoteServer, type VoteSound } from '../store/types';
+import { applyStatus, isDirect, setServerError, type VoteServer, type VoteSound } from '../store/types';
 import { TEST_ALARM } from '../platform';
 import { checkServers, countAvailable, nextDeadline, type Notice } from './engine';
 
@@ -108,7 +108,8 @@ async function check() {
 }
 
 async function refreshAll() {
-  const { servers } = await readData();
+  // Les serveurs ajoutés par lien de vote n'ont pas de site à relire.
+  const servers = (await readData()).servers.filter((server) => !isDirect(server));
   const answers = await Promise.all(
     servers.map(async (server): Promise<[string, VoteUserStatus | string]> => {
       try {
